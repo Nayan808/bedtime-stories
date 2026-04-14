@@ -1,19 +1,56 @@
+import { useState, useRef, useEffect } from 'react'
 import { addCredits } from '../../services/storage'
 
 export default function CreditDisplay({ credits, onRefill }) {
-  function handleRefill() {
-    addCredits(3)
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    function handler(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  function handleRefill(amount) {
+    addCredits(amount)
     onRefill()
+    setOpen(false)
   }
 
   return (
-    <div className="credit-display">
-      <span className="credit-badge" title="Available credits">
+    <div className="credit-display" ref={ref}>
+      <button
+        className="credit-badge clickable"
+        onClick={() => setOpen((v) => !v)}
+        title="Click to add credits"
+      >
         ⭐ {credits} {credits === 1 ? 'credit' : 'credits'}
-      </span>
-      <button className="btn-refill" onClick={handleRefill} title="Demo: add 3 free credits">
-        + Refill (demo)
       </button>
+
+      {open && (
+        <div className="credit-popover">
+          <p className="credit-popover-title">Add Credits</p>
+          <div className="credit-popover-options">
+            <button className="credit-option" onClick={() => handleRefill(3)}>
+              <span className="credit-option-amount">+3</span>
+              <span className="credit-option-label">Quick top-up</span>
+            </button>
+            <button className="credit-option" onClick={() => handleRefill(10)}>
+              <span className="credit-option-amount">+10</span>
+              <span className="credit-option-label">Standard</span>
+            </button>
+            <button className="credit-option featured" onClick={() => handleRefill(25)}>
+              <span className="credit-option-amount">+25</span>
+              <span className="credit-option-label">Best value</span>
+            </button>
+          </div>
+          <p className="credit-popover-note">Demo mode — free credits</p>
+        </div>
+      )}
     </div>
   )
 }

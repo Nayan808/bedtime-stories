@@ -12,11 +12,32 @@ export default function App() {
   const [showNoCredits, setShowNoCredits] = useState(false)
   const [activeStory, setActiveStory] = useState(null)
   const [generating, setGenerating]   = useState(false)
+  const [installPrompt, setInstallPrompt] = useState(null)
+  const [installed, setInstalled]     = useState(false)
 
   useEffect(() => {
     runMigrations()
     setCredits(getCredits())
+
+    const handler = (e) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', () => {
+      setInstalled(true)
+      setInstallPrompt(null)
+    })
+    return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
+
+  async function handleInstall() {
+    if (!installPrompt) return
+    await installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') setInstalled(true)
+    setInstallPrompt(null)
+  }
 
   const refreshCredits = useCallback(() => {
     setCredits(getCredits())
@@ -35,6 +56,11 @@ export default function App() {
         </button>
 
         <nav className="header-nav">
+          {installPrompt && !installed && (
+            <button className="btn-install" onClick={handleInstall} title="Install app on your device">
+              ⬇ Install App
+            </button>
+          )}
           <button
             className={`nav-btn${page === 'history' ? ' active' : ''}`}
             onClick={() => setPage('history')}
