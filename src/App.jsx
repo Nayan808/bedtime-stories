@@ -112,6 +112,7 @@ export default function App() {
               setActiveStory({ ...story, fromHistory: true })
               setPage('home')
             }}
+            onHome={() => setPage('home')}
           />
         ) : activeStory ? (
           <StoryOutput

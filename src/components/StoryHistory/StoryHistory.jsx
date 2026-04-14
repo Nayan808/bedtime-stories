@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getHistory, deleteStory, clearHistory } from '../../services/storage'
 
-export default function StoryHistory({ onReadStory }) {
+export default function StoryHistory({ onReadStory, onHome }) {
   const [history, setHistory] = useState([])
   const [confirmClear, setConfirmClear] = useState(false)
 
@@ -26,6 +26,7 @@ export default function StoryHistory({ onReadStory }) {
         <div className="history-empty-icon">📚</div>
         <h2>No stories yet</h2>
         <p>Generate your first story and it will appear here — free to re-read anytime!</p>
+        <button className="btn-create-story" onClick={onHome}>✨ Create a Story</button>
       </div>
     )
   }
@@ -33,7 +34,10 @@ export default function StoryHistory({ onReadStory }) {
   return (
     <div className="story-history">
       <div className="history-header">
-        <h2 className="history-title">Story History</h2>
+        <div className="history-header-left">
+          <button className="btn-back" onClick={onHome}>← Create Story</button>
+          <h2 className="history-title">Story History</h2>
+        </div>
         <div className="history-header-actions">
           <span className="history-count">{history.length} {history.length === 1 ? 'story' : 'stories'}</span>
           {!confirmClear ? (
