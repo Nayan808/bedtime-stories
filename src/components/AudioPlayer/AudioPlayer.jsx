@@ -32,6 +32,10 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
   const audioChunksRef   = useRef([])
   const audioDestRef     = useRef(null)
 
+  // Silent AudioContext node — keeps audio session alive on lock screen
+  const silentCtxRef     = useRef(null)
+  const silentNodeRef    = useRef(null)
+
   // ── Load voices ──
   useEffect(() => {
     function load() {
@@ -128,6 +132,8 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
       setPlaying(true)
       startTimeRef.current = Date.now()
       startTimer()
+      startSilentAudio()
+      updateMediaSession(true)
     }
     utter.onboundary = (e) => {
       if (e.name !== 'word') return
@@ -146,6 +152,8 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
       setHighlightIdx(-1)
       setProgress(1)
       clearInterval(timerRef.current)
+      stopSilentAudio()
+      updateMediaSession(false)
     }
     utter.onerror = () => {
       setPlaying(false)
@@ -153,6 +161,57 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
     }
 
     window.speechSynthesis.speak(utter)
+  }
+
+  // ── Keep audio alive on lock screen ──
+  function startSilentAudio() {
+    try {
+      if (silentCtxRef.current) return
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      silentCtxRef.current = ctx
+      // Create a looping buffer of silence
+      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      src.connect(ctx.destination)
+      src.start()
+      silentNodeRef.current = src
+    } catch (_) {}
+  }
+
+  function stopSilentAudio() {
+    try {
+      silentNodeRef.current?.stop()
+      silentCtxRef.current?.close()
+    } catch (_) {}
+    silentCtxRef.current = null
+    silentNodeRef.current = null
+  }
+
+  // ── MediaSession (lock screen controls) ──
+  function updateMediaSession(isPlaying) {
+    if (!('mediaSession' in navigator)) return
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: story.title || 'Bedtime Story',
+      artist: 'Bedtime Stories App',
+      album: '',
+    })
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
+    navigator.mediaSession.setActionHandler('play', () => {
+      window.speechSynthesis.resume()
+      setPlaying(true)
+      startTimeRef.current = Date.now()
+      startTimer()
+      updateMediaSession(true)
+    })
+    navigator.mediaSession.setActionHandler('pause', () => {
+      window.speechSynthesis.pause()
+      setPlaying(false)
+      clearInterval(timerRef.current)
+      pausedElapsedRef.current += (Date.now() - startTimeRef.current) / 1000
+      updateMediaSession(false)
+    })
   }
 
   function startTimer() {
@@ -275,11 +334,28 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
     URL.revokeObjectURL(url)
   }
 
+  // ── Resume speech if browser paused it on tab/screen hide ──
+  useEffect(() => {
+    function handleVisibility() {
+      if (!document.hidden && playing) {
+        // Small delay — browser needs a tick to restore audio context
+        setTimeout(() => {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume()
+          }
+        }, 300)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [playing])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel()
       clearInterval(timerRef.current)
+      stopSilentAudio()
     }
   }, [])
 
