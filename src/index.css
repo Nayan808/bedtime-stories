@@ -66,7 +66,63 @@ body {
   letter-spacing: -0.02em;
 }
 
-.header-nav { display: flex; align-items: center; gap: 0.75rem; }
+.header-nav { display: flex; align-items: center; gap: 0.75rem; position: relative; }
+
+.nav-desktop { display: flex; align-items: center; gap: 0.75rem; }
+
+/* ── Hamburger ── */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid var(--black);
+  border-radius: var(--radius-sm);
+  padding: 0.38rem 0.5rem;
+  cursor: pointer;
+  width: 38px;
+  height: 36px;
+}
+.ham-line {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--black);
+  border-radius: 2px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.ham-line.open:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.ham-line.open:nth-child(2) { opacity: 0; }
+.ham-line.open:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ── Mobile dropdown menu ── */
+.mobile-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 100;
+  background: var(--white);
+  border-top: 1.5px solid var(--black);
+  border-bottom: 1.5px solid var(--black);
+  flex-direction: column;
+}
+.mobile-menu-item {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--grey-mid);
+  color: var(--black);
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.9rem 1.25rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.mobile-menu-item:last-child { border-bottom: none; }
+.mobile-menu-item:hover, .mobile-menu-item.active { background: var(--grey-light); font-weight: 700; }
 
 .nav-btn {
   background: none;
@@ -971,8 +1027,12 @@ body {
   .history-card  { flex-direction: column; }
   .history-card-actions { flex-direction: row; align-self: stretch; justify-content: space-between; }
   .modal         { padding: 2rem 1.25rem; box-shadow: 3px 3px 0 var(--black); }
-
   .story-article { padding: 1.25rem; }
+
+  /* Show hamburger, hide desktop nav items */
+  .nav-desktop   { display: none; }
+  .hamburger     { display: flex; }
+  .mobile-menu   { display: flex; }
 }
 @media (max-width: 400px) {
   .credit-badge { font-size: 0.72rem; padding: 0.2rem 0.5rem; }

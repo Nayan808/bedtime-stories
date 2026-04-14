@@ -14,6 +14,7 @@ export default function App() {
   const [generating, setGenerating]   = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installed, setInstalled]     = useState(false)
+  const [menuOpen, setMenuOpen]       = useState(false)
 
   useEffect(() => {
     runMigrations()
@@ -56,22 +57,52 @@ export default function App() {
         </button>
 
         <nav className="header-nav">
-          {installPrompt && !installed && (
-            <button className="btn-install" onClick={handleInstall} title="Install app on your device">
-              ⬇ Install App
+          {/* Desktop: always visible */}
+          <div className="nav-desktop">
+            {installPrompt && !installed && (
+              <button className="btn-install" onClick={handleInstall} title="Install app on your device">
+                ⬇ Install App
+              </button>
+            )}
+            <button
+              className={`nav-btn${page === 'history' ? ' active' : ''}`}
+              onClick={() => setPage('history')}
+            >
+              📚 History
             </button>
-          )}
+          </div>
+
+          <CreditDisplay credits={credits} onRefill={refreshCredits} />
+
+          {/* Mobile: hamburger */}
           <button
-            className={`nav-btn${page === 'history' ? ' active' : ''}`}
-            onClick={() => setPage('history')}
+            className="hamburger"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Menu"
+            aria-expanded={menuOpen}
           >
-            📚 History
+            <span className={`ham-line${menuOpen ? ' open' : ''}`} />
+            <span className={`ham-line${menuOpen ? ' open' : ''}`} />
+            <span className={`ham-line${menuOpen ? ' open' : ''}`} />
           </button>
-          <CreditDisplay
-            credits={credits}
-            onRefill={refreshCredits}
-          />
         </nav>
+
+        {/* Mobile dropdown */}
+        {menuOpen && (
+          <div className="mobile-menu">
+            {installPrompt && !installed && (
+              <button className="mobile-menu-item" onClick={() => { handleInstall(); setMenuOpen(false) }}>
+                ⬇ Install App
+              </button>
+            )}
+            <button
+              className={`mobile-menu-item${page === 'history' ? ' active' : ''}`}
+              onClick={() => { setPage('history'); setMenuOpen(false) }}
+            >
+              📚 History
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="app-main">
