@@ -1,40 +1,42 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { deductCredits, addCredits, attachAudioToStory } from '../../services/storage'
+import { useState, useEffect, useRef } from 'react'
+import { deductCredits, attachAudioToStory } from '../../services/storage'
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2]
 
 export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCredits }) {
-  const [voices, setVoices]           = useState([])
+  const [voices, setVoices]             = useState([])
   const [selectedVoice, setSelectedVoice] = useState(null)
-  const [speed, setSpeed]             = useState(1)
-  const [playing, setPlaying]         = useState(false)
-  const [unlocked, setUnlocked]       = useState(false)   // paid the 2-credit cost
-  const [progress, setProgress]       = useState(0)       // 0–1
-  const [elapsed, setElapsed]         = useState(0)       // seconds
-  const [totalTime, setTotalTime]     = useState(0)       // estimate in seconds
+  const [speed, setSpeed]               = useState(1)
+  const [playing, setPlaying]           = useState(false)
+  const [unlocked, setUnlocked]         = useState(false)
+  const [progress, setProgress]         = useState(0)
+  const [elapsed, setElapsed]           = useState(0)
+  const [totalTime, setTotalTime]       = useState(0)
   const [highlightIdx, setHighlightIdx] = useState(-1)
-  const [audioBlob, setAudioBlob]     = useState(null)    // recorded audio
-  const [recording, setRecording]     = useState(false)
-  const [locked, setLocked]           = useState(false)   // lock screen active
-  const [tapCount, setTapCount]       = useState(0)       // unlock taps counted
-  const tapResetRef                   = useRef(null)       // timer to reset taps
+  const [recording, setRecording]       = useState(false)
+  const [locked, setLocked]             = useState(false)
+  const [tapCount, setTapCount]         = useState(0)
 
-  // TTS words split
-  const words = useRef([])
-  const utterRef   = useRef(null)
-  const wordIdxRef = useRef(0)
-  const timerRef   = useRef(null)
-  const startTimeRef = useRef(0)
+  // refs that don't need re-renders
+  const words            = useRef([])
+  const wordIdxRef       = useRef(0)
+  const playingRef       = useRef(false)   // mirrors `playing` state for use inside closures
+  const speedRef         = useRef(1)
+  const selectedVoiceRef = useRef(null)
+  const timerRef         = useRef(null)
+  const watchdogRef      = useRef(null)
+  const startTimeRef     = useRef(0)
   const pausedElapsedRef = useRef(0)
+  const tapResetRef      = useRef(null)
 
-  // MediaRecorder for audio capture
-  const mediaRecorderRef = useRef(null)
-  const audioChunksRef   = useRef([])
-  const audioDestRef     = useRef(null)
+  // Silent AudioContext — keeps audio session alive on lock screen
+  const silentCtxRef  = useRef(null)
+  const silentNodeRef = useRef(null)
 
-  // Silent AudioContext node — keeps audio session alive on lock screen
-  const silentCtxRef     = useRef(null)
-  const silentNodeRef    = useRef(null)
+  // Keep refs in sync with state
+  useEffect(() => { playingRef.current = playing }, [playing])
+  useEffect(() => { speedRef.current = speed }, [speed])
+  useEffect(() => { selectedVoiceRef.current = selectedVoice }, [selectedVoice])
 
   // ── Load voices ──
   useEffect(() => {
@@ -47,14 +49,14 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
     return () => window.speechSynthesis.removeEventListener('voiceschanged', load)
   }, [])
 
-  // Auto-select first English-ish voice
+  // Auto-select matching voice
   useEffect(() => {
     if (voices.length && !selectedVoice) {
       const lang = story.settings?.language || 'English'
       let match = voices.find((v) => v.lang.startsWith('en'))
       if (lang !== 'English') {
-        const langCode = LANG_CODES[lang]
-        if (langCode) match = voices.find((v) => v.lang.startsWith(langCode)) || match
+        const code = LANG_CODES[lang]
+        if (code) match = voices.find((v) => v.lang.startsWith(code)) || match
       }
       setSelectedVoice(match || voices[0])
     }
@@ -62,118 +64,96 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
 
   // Estimate total time
   useEffect(() => {
-    const wps = 2.5 * speed  // ~150 wpm baseline
-    const text = story.body || ''
-    const wc = text.split(/\s+/).filter(Boolean).length
+    const wps = 2.5 * speed
+    const wc  = (story.body || '').split(/\s+/).filter(Boolean).length
     setTotalTime(Math.round(wc / wps))
   }, [story.body, speed])
 
-  // ── Prepare words array ──
+  // Build words array
   useEffect(() => {
-    const raw = `${story.title}. ${story.body || ''}`
-    words.current = raw.split(/\s+/).filter(Boolean)
+    words.current = `${story.title}. ${story.body || ''}`.split(/\s+/).filter(Boolean)
   }, [story.title, story.body])
 
-  // ── Unlock and start ──
-  function handlePlayPress() {
-    if (story.fromHistory) {
-      // Free from history
-      startPlayback()
-      return
-    }
-    if (unlocked) {
-      togglePlayPause()
-      return
-    }
-    // Costs 2 credits
-    if (credits < 2) {
-      onOutOfCredits()
-      return
-    }
-    deductCredits(2)
-    onCreditsChange()
-    setUnlocked(true)
-    startPlayback()
-  }
-
-  function startPlayback() {
-    if (playing) return
-    speak(wordIdxRef.current)
-  }
-
-  function togglePlayPause() {
-    if (playing) {
-      window.speechSynthesis.pause()
-      setPlaying(false)
-      clearInterval(timerRef.current)
-      pausedElapsedRef.current += (Date.now() - startTimeRef.current) / 1000
-    } else {
-      window.speechSynthesis.resume()
-      setPlaying(true)
-      startTimeRef.current = Date.now()
-      startTimer()
-    }
-  }
-
-  function speak(fromWordIdx = 0) {
+  // ── Core speak — cancel old utterance, start fresh from word index ──
+  function speak(fromIdx = 0) {
     window.speechSynthesis.cancel()
     clearInterval(timerRef.current)
+    clearInterval(watchdogRef.current)
 
-    wordIdxRef.current = fromWordIdx
-    const text = words.current.slice(fromWordIdx).join(' ')
+    wordIdxRef.current = fromIdx
+    const text = words.current.slice(fromIdx).join(' ')
     if (!text.trim()) return
 
-    const utter = new SpeechSynthesisUtterance(text)
-    utter.rate  = speed
-    if (selectedVoice) utter.voice = selectedVoice
-    utterRef.current = utter
+    const utter   = new SpeechSynthesisUtterance(text)
+    utter.rate    = speedRef.current
+    utter.voice   = selectedVoiceRef.current
 
     utter.onstart = () => {
       setPlaying(true)
+      playingRef.current = true
       startTimeRef.current = Date.now()
       startTimer()
       startSilentAudio()
       updateMediaSession(true)
+      startWatchdog()
     }
+
     utter.onboundary = (e) => {
       if (e.name !== 'word') return
-      // estimate word index from char index
-      const spokenText = text.slice(0, e.charIndex)
-      const spokenWords = spokenText.split(/\s+/).filter(Boolean).length
-      const idx = fromWordIdx + spokenWords
+      const spokenWords = text.slice(0, e.charIndex).split(/\s+/).filter(Boolean).length
+      const idx = fromIdx + spokenWords
       wordIdxRef.current = idx
       setHighlightIdx(idx)
-      // update progress
-      const frac = idx / Math.max(1, words.current.length)
-      setProgress(frac)
+      setProgress(idx / Math.max(1, words.current.length))
     }
+
     utter.onend = () => {
       setPlaying(false)
+      playingRef.current = false
       setHighlightIdx(-1)
       setProgress(1)
       clearInterval(timerRef.current)
+      clearInterval(watchdogRef.current)
       stopSilentAudio()
       updateMediaSession(false)
     }
-    utter.onerror = () => {
+
+    utter.onerror = (e) => {
+      // 'interrupted' fires when we cancel intentionally — ignore it
+      if (e.error === 'interrupted' || e.error === 'canceled') return
       setPlaying(false)
+      playingRef.current = false
       clearInterval(timerRef.current)
+      clearInterval(watchdogRef.current)
     }
 
     window.speechSynthesis.speak(utter)
   }
 
-  // ── Keep audio alive on lock screen ──
+  // ── Watchdog: Chrome Android stops speech after ~15s in background ──
+  // Every second, if we think we're playing but speechSynthesis isn't speaking, restart.
+  function startWatchdog() {
+    clearInterval(watchdogRef.current)
+    watchdogRef.current = setInterval(() => {
+      if (!playingRef.current) { clearInterval(watchdogRef.current); return }
+      const ss = window.speechSynthesis
+      if (!ss.speaking && !ss.pending) {
+        // Unexpectedly stopped — re-speak from last known word
+        speak(wordIdxRef.current)
+      }
+    }, 1000)
+  }
+
+  // ── Silent AudioContext ──
   function startSilentAudio() {
     try {
       if (silentCtxRef.current) return
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       silentCtxRef.current = ctx
-      // Create a looping buffer of silence
       const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate)
       const src = ctx.createBufferSource()
       src.buffer = buf
-      src.loop = true
+      src.loop   = true
       src.connect(ctx.destination)
       src.start()
       silentNodeRef.current = src
@@ -181,35 +161,34 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
   }
 
   function stopSilentAudio() {
-    try {
-      silentNodeRef.current?.stop()
-      silentCtxRef.current?.close()
-    } catch (_) {}
-    silentCtxRef.current = null
+    try { silentNodeRef.current?.stop() } catch (_) {}
+    try { silentCtxRef.current?.close() } catch (_) {}
+    silentCtxRef.current  = null
     silentNodeRef.current = null
   }
 
-  // ── MediaSession (lock screen controls) ──
+  // ── MediaSession (OS lock screen controls) ──
   function updateMediaSession(isPlaying) {
     if (!('mediaSession' in navigator)) return
     navigator.mediaSession.metadata = new MediaMetadata({
       title: story.title || 'Bedtime Story',
       artist: 'Bedtime Stories App',
-      album: '',
     })
     navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
+    // Use speak() not resume() — resume() is broken in Chrome
     navigator.mediaSession.setActionHandler('play', () => {
-      window.speechSynthesis.resume()
-      setPlaying(true)
-      startTimeRef.current = Date.now()
-      startTimer()
-      updateMediaSession(true)
+      speak(wordIdxRef.current)
     })
     navigator.mediaSession.setActionHandler('pause', () => {
-      window.speechSynthesis.pause()
-      setPlaying(false)
+      const pos = wordIdxRef.current
+      window.speechSynthesis.cancel()
       clearInterval(timerRef.current)
+      clearInterval(watchdogRef.current)
+      stopSilentAudio()
       pausedElapsedRef.current += (Date.now() - startTimeRef.current) / 1000
+      wordIdxRef.current = pos
+      setPlaying(false)
+      playingRef.current = false
       updateMediaSession(false)
     })
   }
@@ -222,6 +201,87 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
     }, 500)
   }
 
+  // ── Visibility: re-speak when returning from background / unlock ──
+  useEffect(() => {
+    function onVisible() {
+      if (!document.hidden && playingRef.current) {
+        // Give browser a moment, then check if speech actually stopped
+        setTimeout(() => {
+          if (!window.speechSynthesis.speaking) {
+            speak(wordIdxRef.current)
+          } else if (window.speechSynthesis.paused) {
+            // Fallback try resume — some browsers support it
+            window.speechSynthesis.resume()
+          }
+        }, 400)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, []) // no deps — uses refs only
+
+  // ── Controls ──
+  function handlePlayPress() {
+    if (!story.fromHistory && !unlocked) {
+      if (credits < 2) { onOutOfCredits(); return }
+      deductCredits(2)
+      onCreditsChange()
+      setUnlocked(true)
+    }
+    if (playing) {
+      // PAUSE: cancel speech, save position
+      const pos = wordIdxRef.current
+      window.speechSynthesis.cancel()
+      clearInterval(timerRef.current)
+      clearInterval(watchdogRef.current)
+      stopSilentAudio()
+      pausedElapsedRef.current += (Date.now() - startTimeRef.current) / 1000
+      wordIdxRef.current = pos
+      setPlaying(false)
+      playingRef.current = false
+      updateMediaSession(false)
+    } else {
+      // PLAY: speak from saved position
+      speak(wordIdxRef.current)
+    }
+  }
+
+  function handleRestart() {
+    window.speechSynthesis.cancel()
+    clearInterval(timerRef.current)
+    clearInterval(watchdogRef.current)
+    stopSilentAudio()
+    wordIdxRef.current     = 0
+    pausedElapsedRef.current = 0
+    setProgress(0)
+    setElapsed(0)
+    setHighlightIdx(-1)
+    setPlaying(false)
+    playingRef.current = false
+    // Small delay so cancel() fully clears before new utterance
+    setTimeout(() => speak(0), 80)
+  }
+
+  function handleSpeedChange(s) {
+    setSpeed(s)
+    speedRef.current = s
+    if (playingRef.current) {
+      const idx = wordIdxRef.current
+      window.speechSynthesis.cancel()
+      setTimeout(() => speak(idx), 80)
+    }
+  }
+
+  function handleProgressClick(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const frac = (e.clientX - rect.left) / rect.width
+    const idx  = Math.floor(frac * words.current.length)
+    pausedElapsedRef.current = frac * totalTime
+    setProgress(frac)
+    setElapsed(frac * totalTime)
+    speak(idx)
+  }
+
   function handleLock() {
     setLocked(true)
     setTapCount(0)
@@ -232,161 +292,84 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
     clearTimeout(tapResetRef.current)
     setTapCount((prev) => {
       const next = prev + 1
-      if (next >= 3) {
-        setLocked(false)
-        return 0
-      }
-      // Reset counter if user stops tapping for 1.5 s
+      if (next >= 3) { setLocked(false); return 0 }
       tapResetRef.current = setTimeout(() => setTapCount(0), 1500)
       return next
     })
   }
 
-  function handleRestart() {
-    window.speechSynthesis.cancel()
-    clearInterval(timerRef.current)
-    wordIdxRef.current = 0
-    pausedElapsedRef.current = 0
-    setProgress(0)
-    setElapsed(0)
-    setHighlightIdx(-1)
-    setPlaying(false)
-    speak(0)
-  }
-
-  function handleSpeedChange(s) {
-    setSpeed(s)
-    if (playing) {
-      // restart from current word with new speed
-      const idx = wordIdxRef.current
-      window.speechSynthesis.cancel()
-      clearInterval(timerRef.current)
-      setPlaying(false)
-      setTimeout(() => speak(idx), 50)
-    }
-  }
-
-  function handleProgressClick(e) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const frac = (e.clientX - rect.left) / rect.width
-    const idx  = Math.floor(frac * words.current.length)
-    window.speechSynthesis.cancel()
-    clearInterval(timerRef.current)
-    pausedElapsedRef.current = frac * totalTime
-    setProgress(frac)
-    setElapsed(frac * totalTime)
-    speak(idx)
-  }
-
-  // ── Audio download via AudioContext ──
+  // ── Audio download ──
   async function handleDownloadAudio() {
-    // We capture by re-speaking into an OfflineAudioContext via audio element.
-    // Since TTS doesn't route through Web Audio API directly, we use a creative
-    // approach: record system audio via MediaRecorder if available, otherwise
-    // we store the raw text and create a .txt fallback.
-    // The cleanest cross-browser approach: use MediaDevices to capture audio
-    // while TTS plays, but that requires user permission. Instead we'll use
-    // the base64 blob if already recorded, or prompt.
     try {
       setRecording(true)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream   = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
-      const chunks = []
+      const chunks   = []
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' })
-        setAudioBlob(blob)
-        // Save to history
         const reader = new FileReader()
-        reader.onload = () => {
-          attachAudioToStory(story.id, reader.result, 'audio/webm')
-        }
+        reader.onload = () => attachAudioToStory(story.id, reader.result, 'audio/webm')
         reader.readAsDataURL(blob)
         downloadBlob(blob, `${story.title}.webm`)
         stream.getTracks().forEach((t) => t.stop())
         setRecording(false)
       }
       recorder.start()
-      // Speak the story
-      const text = `${story.title}. ${story.body || ''}`
-      const utter = new SpeechSynthesisUtterance(text)
-      utter.rate = speed
-      if (selectedVoice) utter.voice = selectedVoice
-      utter.onend = () => recorder.stop()
+      const utter = new SpeechSynthesisUtterance(`${story.title}. ${story.body || ''}`)
+      utter.rate  = speedRef.current
+      utter.voice = selectedVoiceRef.current
+      utter.onend   = () => recorder.stop()
       utter.onerror = () => { recorder.stop(); setRecording(false) }
       window.speechSynthesis.cancel()
       window.speechSynthesis.speak(utter)
     } catch {
-      // Fallback: download as .txt
       setRecording(false)
-      alert('Audio recording requires microphone access. Downloading as text instead.')
-      const content = `${story.title}\n\n${story.body}`
-      downloadBlob(new Blob([content], { type: 'text/plain' }), `${story.title}.txt`)
+      alert('Microphone access needed for audio download. Saving as text instead.')
+      downloadBlob(new Blob([`${story.title}\n\n${story.body}`], { type: 'text/plain' }), `${story.title}.txt`)
     }
   }
 
   function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
+    const a   = document.createElement('a')
+    a.href    = url
     a.download = filename.replace(/[^a-z0-9.\-_]/gi, '_')
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  // ── Resume speech if browser paused it on tab/screen hide ──
-  useEffect(() => {
-    function handleVisibility() {
-      if (!document.hidden && playing) {
-        // Small delay — browser needs a tick to restore audio context
-        setTimeout(() => {
-          if (window.speechSynthesis.paused) {
-            window.speechSynthesis.resume()
-          }
-        }, 300)
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [playing])
-
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel()
       clearInterval(timerRef.current)
+      clearInterval(watchdogRef.current)
       stopSilentAudio()
     }
   }, [])
 
-  const canPlay = story.fromHistory || unlocked || credits >= 2
-
-  // ── Render highlighted text ──
-  const allWords = words.current
-  const storyTitle = story.title || ''
+  const storyTitle     = story.title || ''
   const titleWordCount = storyTitle.split(/\s+/).filter(Boolean).length
 
   return (
     <div className="audio-player">
       <h3 className="player-heading">🎧 Voice Playback</h3>
 
-      {/* ── Cost notice ── */}
       {!unlocked && !story.fromHistory && (
         <div className="voice-cost-notice">
           <span>Listening costs <strong>2 credits</strong> (you have {credits})</span>
         </div>
       )}
 
-      {/* ── Play / Pause ── */}
       <div className="player-controls">
         <button
           className={`btn-play${playing ? ' playing' : ''}`}
           onClick={handlePlayPress}
           disabled={recording}
         >
-          {playing ? '⏸ Pause' : (unlocked || story.fromHistory) ? '▶ Play' : `▶ Play — 2 credits`}
+          {playing ? '⏸ Pause' : (unlocked || story.fromHistory) ? '▶ Play' : '▶ Play — 2 credits'}
         </button>
-
         <button className="btn-restart" onClick={handleRestart} title="Restart from beginning">
           ↩ Restart
         </button>
@@ -397,7 +380,6 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
         )}
       </div>
 
-      {/* ── Progress bar ── */}
       <div className="progress-bar-track" onClick={handleProgressClick} role="slider" aria-valuenow={Math.round(progress * 100)} tabIndex={0}>
         <div className="progress-bar-fill" style={{ width: `${progress * 100}%` }} />
       </div>
@@ -406,21 +388,15 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
         <span>{fmt(totalTime)}</span>
       </div>
 
-      {/* ── Speed ── */}
       <div className="speed-controls">
         <span className="speed-label">Speed:</span>
         {SPEEDS.map((s) => (
-          <button
-            key={s}
-            className={`btn-speed${speed === s ? ' active' : ''}`}
-            onClick={() => handleSpeedChange(s)}
-          >
+          <button key={s} className={`btn-speed${speed === s ? ' active' : ''}`} onClick={() => handleSpeedChange(s)}>
             {s}x
           </button>
         ))}
       </div>
 
-      {/* ── Voice selector ── */}
       {voices.length > 0 && (
         <div className="voice-selector">
           <label className="voice-label">Voice:</label>
@@ -433,50 +409,41 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
             }}
           >
             {voices.map((v) => (
-              <option key={v.name} value={v.name}>
-                {v.name} ({v.lang})
-              </option>
+              <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
             ))}
           </select>
         </div>
       )}
 
-      {/* ── Highlighted story text ── */}
       {(unlocked || story.fromHistory) && (
         <div className="highlighted-story">
           <p className="hl-title">
             {storyTitle.split(/\s+/).filter(Boolean).map((w, i) => (
-              <span key={i} className={highlightIdx === i ? 'word-highlight' : ''}>
-                {w}{' '}
-              </span>
+              <span key={i} className={highlightIdx === i ? 'word-highlight' : ''}>{w}{' '}</span>
             ))}
           </p>
-          {(story.body || '').split('\n').map((para, pi) => (
+          {(story.body || '').split('\n').map((para, pi) =>
             para.trim() ? (
               <p key={pi}>
                 {para.split(/\s+/).filter(Boolean).map((w, wi) => {
-                  const globalIdx = titleWordCount + /* rough offset */ wi
+                  const globalIdx = titleWordCount + wi
                   return (
-                    <span key={wi} className={highlightIdx === globalIdx ? 'word-highlight' : ''}>
-                      {w}{' '}
-                    </span>
+                    <span key={wi} className={highlightIdx === globalIdx ? 'word-highlight' : ''}>{w}{' '}</span>
                   )
                 })}
               </p>
             ) : <br key={pi} />
-          ))}
+          )}
         </div>
       )}
 
-      {/* ── Download ── */}
       <div className="download-row">
         <button className="btn-download-audio" onClick={handleDownloadAudio} disabled={recording}>
           {recording ? '⏺ Recording...' : '⬇ Download Audio'}
         </button>
-        {recording && <span className="recording-hint">Speak is being captured... wait for TTS to finish.</span>}
+        {recording && <span className="recording-hint">Capturing audio... wait for TTS to finish.</span>}
       </div>
 
-      {/* ── Lock screen overlay ── */}
       {locked && (
         <div className="lock-overlay" onClick={handleLockTap}>
           <div className="lock-inner">
@@ -489,9 +456,7 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
                 <span key={i} className={`lock-dot${tapCount > i ? ' filled' : ''}`} />
               ))}
             </div>
-            {tapCount > 0 && (
-              <p className="lock-tap-count">{tapCount} / 3</p>
-            )}
+            {tapCount > 0 && <p className="lock-tap-count">{tapCount} / 3</p>}
           </div>
         </div>
       )}
@@ -502,8 +467,7 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
 function fmt(secs) {
   const s = Math.floor(secs)
   const m = Math.floor(s / 60)
-  const r = s % 60
-  return `${m}:${r.toString().padStart(2, '0')}`
+  return `${m}:${String(s % 60).padStart(2, '0')}`
 }
 
 const LANG_CODES = {
