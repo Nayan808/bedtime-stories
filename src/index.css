@@ -180,6 +180,14 @@ body {
 .btn-google-signin:hover { border-color: var(--black); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
 .google-icon { flex-shrink: 0; }
 
+.google-btn-wrapper { display: flex; align-items: center; }
+.google-btn-center { display: flex; justify-content: center; margin: 0.25rem 0; }
+.no-client-id-hint { font-size: 0.7rem; color: red; white-space: nowrap; }
+.avatar-chevron { font-size: 0.55rem; color: var(--grey-text); margin-left: 2px; }
+.user-dropdown-text { min-width: 0; }
+.user-dropdown-text .user-dropdown-name,
+.user-dropdown-text .user-dropdown-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ── User avatar & dropdown ── */
 .user-menu { position: relative; }
 .user-avatar-btn {
