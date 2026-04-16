@@ -6,38 +6,44 @@ export const KEYS = {
   USER:     'bs_user',
 }
 
-// ─── Per-user credits (keyed by Google user ID) ───────────────────────────────
-// Returns the user's credit balance; gives 3 free credits on first ever login.
-export function initUserCredits(userId) {
-  const initKey = `bs_init_${userId}`
-  const balKey  = `bs_credits_${userId}`
-  if (!localStorage.getItem(initKey)) {
-    localStorage.setItem(initKey, '1')
-    localStorage.setItem(balKey, '3')
-    return 3
+// ─── Device-level credits ─────────────────────────────────────────────────────
+// Credits are bound to the device (localStorage), not to an account.
+// First login on any device → 3 free credits, once ever.
+// Same account on a different device → that device also gets 3 fresh credits.
+// Switching accounts on the same device → no bonus (device already initialised).
+
+const DEVICE_INIT_KEY    = 'bs_device_init'
+const DEVICE_CREDITS_KEY = 'bs_device_credits'
+const FREE_CREDITS       = 3
+
+export function initDeviceCredits() {
+  if (!localStorage.getItem(DEVICE_INIT_KEY)) {
+    localStorage.setItem(DEVICE_INIT_KEY, '1')
+    localStorage.setItem(DEVICE_CREDITS_KEY, String(FREE_CREDITS))
+    return FREE_CREDITS
   }
-  const raw = localStorage.getItem(balKey)
+  const raw = localStorage.getItem(DEVICE_CREDITS_KEY)
   return raw !== null ? parseInt(raw, 10) : 0
 }
 
-export function getUserCredits(userId) {
-  const raw = localStorage.getItem(`bs_credits_${userId}`)
+export function getDeviceCredits() {
+  const raw = localStorage.getItem(DEVICE_CREDITS_KEY)
   return raw !== null ? parseInt(raw, 10) : 0
 }
 
-export function setUserCredits(userId, amount) {
-  localStorage.setItem(`bs_credits_${userId}`, String(Math.max(0, amount)))
+export function setDeviceCredits(amount) {
+  localStorage.setItem(DEVICE_CREDITS_KEY, String(Math.max(0, amount)))
 }
 
-export function deductUserCredits(userId, amount) {
-  const next = Math.max(0, getUserCredits(userId) - amount)
-  setUserCredits(userId, next)
+export function deductDeviceCredits(amount) {
+  const next = Math.max(0, getDeviceCredits() - amount)
+  setDeviceCredits(next)
   return next
 }
 
-export function addUserCredits(userId, amount) {
-  const next = getUserCredits(userId) + amount
-  setUserCredits(userId, next)
+export function addDeviceCredits(amount) {
+  const next = getDeviceCredits() + amount
+  setDeviceCredits(next)
   return next
 }
 
@@ -58,41 +64,6 @@ export function clearUser() {
   localStorage.removeItem(KEYS.USER)
 }
 
-const INITIAL_CREDITS = 3
-
-// ─── Credits ─────────────────────────────────────────────────────────────────
-
-export function getCredits() {
-  const raw = localStorage.getItem(KEYS.CREDITS)
-  if (raw === null) {
-    // First visit — assign 3 free credits
-    setCredits(INITIAL_CREDITS)
-    return INITIAL_CREDITS
-  }
-  return parseInt(raw, 10)
-}
-
-export function setCredits(amount) {
-  localStorage.setItem(KEYS.CREDITS, String(Math.max(0, amount)))
-}
-
-export function deductCredits(amount) {
-  const current = getCredits()
-  const next = Math.max(0, current - amount)
-  setCredits(next)
-  return next
-}
-
-export function addCredits(amount) {
-  const current = getCredits()
-  const next = current + amount
-  setCredits(next)
-  return next
-}
-
-export function hasCredits(amount = 1) {
-  return getCredits() >= amount
-}
 
 // ─── History ─────────────────────────────────────────────────────────────────
 

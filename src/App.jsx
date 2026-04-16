@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   runMigrations, getUser,
-  initUserCredits, getUserCredits, deductUserCredits, addUserCredits,
+  initDeviceCredits, getDeviceCredits, deductDeviceCredits, addDeviceCredits,
 } from './services/storage'
 import StoryForm from './components/StoryForm/StoryForm'
 import StoryOutput from './components/StoryOutput/StoryOutput'
@@ -26,9 +26,8 @@ export default function App() {
   useEffect(() => {
     runMigrations()
 
-    // Load credits for already-logged-in user (page refresh)
-    const saved = getUser()
-    if (saved) setCredits(getUserCredits(saved.id))
+    // Load device credits if user is already logged in (page refresh)
+    if (getUser()) setCredits(getDeviceCredits())
 
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
     window.addEventListener('beforeinstallprompt', handler)
@@ -40,31 +39,27 @@ export default function App() {
   function handleUserChange(newUser) {
     setUser(newUser)
     if (newUser) {
-      // New user → 3 credits; returning user → restore their balance
-      const bal = initUserCredits(newUser.id)
-      setCredits(bal)
-      // If login modal was open, close it
+      // First login on this device → 3 credits; returning → restore balance
+      setCredits(initDeviceCredits())
       setShowLoginRequired(false)
     } else {
       setCredits(0)
     }
   }
 
-  // All credit operations go through here so they stay in sync with localStorage
+  // All credit operations go through here — device-level storage
   const refreshCredits = useCallback(() => {
-    if (user) setCredits(getUserCredits(user.id))
+    if (user) setCredits(getDeviceCredits())
   }, [user])
 
   const deductCredits = useCallback((amount) => {
     if (!user) return
-    const next = deductUserCredits(user.id, amount)
-    setCredits(next)
+    setCredits(deductDeviceCredits(amount))
   }, [user])
 
   const addCredits = useCallback((amount) => {
     if (!user) return
-    const next = addUserCredits(user.id, amount)
-    setCredits(next)
+    setCredits(addDeviceCredits(amount))
   }, [user])
 
   async function handleInstall() {
