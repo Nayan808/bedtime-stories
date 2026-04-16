@@ -215,13 +215,18 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
       speak(wordIdxRef.current)
     })
     navigator.mediaSession.setActionHandler('pause', () => {
-      const pos = wordIdxRef.current
       window.speechSynthesis.cancel()
       clearInterval(timerRef.current)
       clearInterval(watchdogRef.current)
       stopSilentAudio()
-      pausedElapsedRef.current += (Date.now() - startTimeRef.current) / 1000
-      wordIdxRef.current = pos
+      const totalElapsed = pausedElapsedRef.current + (Date.now() - startTimeRef.current) / 1000
+      pausedElapsedRef.current = totalElapsed
+      const wps = 2.5 * speedRef.current
+      const timeEstimate = Math.round(wps * totalElapsed)
+      wordIdxRef.current = Math.min(
+        Math.max(wordIdxRef.current, timeEstimate),
+        Math.max(0, words.current.length - 1)
+      )
       setPlaying(false)
       playingRef.current = false
       updateMediaSession(false)
@@ -263,19 +268,30 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
       setUnlocked(true)
     }
     if (playing) {
-      // PAUSE: cancel speech, save position
-      const pos = wordIdxRef.current
+      // PAUSE: stop speech and save position
       window.speechSynthesis.cancel()
       clearInterval(timerRef.current)
       clearInterval(watchdogRef.current)
       stopSilentAudio()
-      pausedElapsedRef.current += (Date.now() - startTimeRef.current) / 1000
-      wordIdxRef.current = pos
+
+      // Save elapsed time
+      const totalElapsed = pausedElapsedRef.current + (Date.now() - startTimeRef.current) / 1000
+      pausedElapsedRef.current = totalElapsed
+
+      // onboundary is unreliable on mobile — also estimate position from time.
+      // Use whichever is further (onboundary may have advanced wordIdxRef precisely).
+      const wps = 2.5 * speedRef.current
+      const timeEstimate = Math.round(wps * totalElapsed)
+      wordIdxRef.current = Math.min(
+        Math.max(wordIdxRef.current, timeEstimate),
+        Math.max(0, words.current.length - 1)
+      )
+
       setPlaying(false)
       playingRef.current = false
       updateMediaSession(false)
     } else {
-      // PLAY: speak from saved position
+      // PLAY / RESUME from saved position
       speak(wordIdxRef.current)
     }
   }
@@ -300,14 +316,22 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     }
   }
 
-  function handleProgressClick(e) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const frac = (e.clientX - rect.left) / rect.width
-    const idx  = Math.floor(frac * words.current.length)
-    pausedElapsedRef.current = frac * totalTime
-    setProgress(frac)
-    setElapsed(frac * totalTime)
-    speak(idx)
+  // Seek to a 0-1 fraction — called while dragging (visual only) or on release (speak)
+  function handleSeekChange(frac) {
+    const clamped = Math.max(0, Math.min(1, frac))
+    const idx = Math.floor(clamped * words.current.length)
+    wordIdxRef.current        = idx
+    pausedElapsedRef.current  = clamped * totalTime
+    setProgress(clamped)
+    setElapsed(clamped * totalTime)
+  }
+
+  function handleSeekCommit(frac) {
+    handleSeekChange(frac)
+    // Only seek if already unlocked/fromHistory; don't auto-unlock via scrub
+    if (unlocked || story.fromHistory) {
+      speak(Math.floor(Math.max(0, Math.min(1, frac)) * words.current.length))
+    }
   }
 
   function handleLock() {
@@ -408,12 +432,24 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
         )}
       </div>
 
-      <div className="progress-bar-track" onClick={handleProgressClick} role="slider" aria-valuenow={Math.round(progress * 100)} tabIndex={0}>
-        <div className="progress-bar-fill" style={{ width: `${progress * 100}%` }} />
-      </div>
-      <div className="progress-time">
-        <span>{fmt(elapsed)}</span>
-        <span>{fmt(totalTime)}</span>
+      <div className="progress-wrap">
+        <input
+          type="range"
+          className="progress-range"
+          min={0}
+          max={1000}
+          value={Math.round(progress * 1000)}
+          style={{ '--progress': Math.round(progress * 100) }}
+          onChange={(e) => handleSeekChange(e.target.value / 1000)}
+          onMouseUp={(e)   => handleSeekCommit(e.target.value / 1000)}
+          onTouchEnd={(e)  => handleSeekCommit(e.target.value / 1000)}
+          onKeyUp={(e)     => handleSeekCommit(e.target.value / 1000)}
+          aria-label="Seek"
+        />
+        <div className="progress-time">
+          <span>{fmt(elapsed)}</span>
+          <span>{fmt(totalTime)}</span>
+        </div>
       </div>
 
       <div className="speed-controls">

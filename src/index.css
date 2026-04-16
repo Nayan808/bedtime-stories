@@ -871,21 +871,48 @@ body {
 }
 .btn-restart:hover { border-color: var(--black); color: var(--black); }
 
-.progress-bar-track {
+.progress-wrap { display: flex; flex-direction: column; gap: 0.3rem; width: 100%; }
+
+/* ── Seek range input ── */
+.progress-range {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   height: 4px;
-  background: var(--grey-mid);
   border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--black) calc(var(--progress, 0) * 1%),
+    var(--grey-mid) calc(var(--progress, 0) * 1%)
+  );
   cursor: pointer;
-  overflow: hidden;
+  outline: none;
+  border: none;
 }
-.progress-bar-fill {
-  height: 100%;
+.progress-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
   background: var(--black);
-  border-radius: 2px;
-  transition: width 0.3s linear;
-  pointer-events: none;
+  cursor: pointer;
+  border: 2px solid var(--white);
+  box-shadow: 0 0 0 1.5px var(--black);
+  transition: transform 0.1s;
 }
+.progress-range::-webkit-slider-thumb:hover { transform: scale(1.25); }
+.progress-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--black);
+  cursor: pointer;
+  border: 2px solid var(--white);
+  box-shadow: 0 0 0 1.5px var(--black);
+}
+.progress-range::-moz-range-progress { background: var(--black); }
+
 .progress-time { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--grey-text); }
 
 .speed-controls { display: flex; align-items: center; gap: 0.4rem; }
