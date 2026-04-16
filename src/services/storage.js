@@ -3,6 +3,24 @@ export const KEYS = {
   CREDITS:  'bs_credits',
   HISTORY:  'bs_history_v1',
   SETTINGS: 'bs_settings',
+  USER:     'bs_user',
+}
+
+// ─── User / Auth ──────────────────────────────────────────────────────────────
+
+export function getUser() {
+  try {
+    const raw = localStorage.getItem(KEYS.USER)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+export function saveUser(user) {
+  localStorage.setItem(KEYS.USER, JSON.stringify(user))
+}
+
+export function clearUser() {
+  localStorage.removeItem(KEYS.USER)
 }
 
 const INITIAL_CREDITS = 3

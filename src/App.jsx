@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { runMigrations, getCredits } from './services/storage'
+import { runMigrations, getCredits, getUser } from './services/storage'
 import StoryForm from './components/StoryForm/StoryForm'
 import StoryOutput from './components/StoryOutput/StoryOutput'
 import StoryHistory from './components/StoryHistory/StoryHistory'
 import CreditDisplay from './components/CreditDisplay/CreditDisplay'
 import OutOfCreditsModal from './components/Modals/OutOfCreditsModal'
+import GoogleAuth from './components/Auth/GoogleAuth'
 
 export default function App() {
   const [page, setPage]               = useState('home')   // 'home' | 'history'
@@ -15,6 +16,7 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installed, setInstalled]     = useState(false)
   const [menuOpen, setMenuOpen]       = useState(false)
+  const [user, setUser]               = useState(() => getUser())
 
   useEffect(() => {
     runMigrations()
@@ -73,6 +75,8 @@ export default function App() {
           </div>
 
           <CreditDisplay credits={credits} onRefill={refreshCredits} />
+
+          <GoogleAuth user={user} onUserChange={setUser} />
 
           {/* Mobile: hamburger */}
           <button

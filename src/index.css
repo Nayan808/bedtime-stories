@@ -160,6 +160,120 @@ body {
   color: var(--black);
 }
 
+/* ── Google Sign-In button ── */
+.btn-google-signin {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  background: var(--white);
+  border: 1px solid var(--grey-mid);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--black);
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  white-space: nowrap;
+}
+.btn-google-signin:hover { border-color: var(--black); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+.google-icon { flex-shrink: 0; }
+
+/* ── User avatar & dropdown ── */
+.user-menu { position: relative; }
+.user-avatar-btn {
+  background: none;
+  border: 2px solid var(--grey-mid);
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  transition: border-color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.user-avatar-btn:hover { border-color: var(--black); }
+.user-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+.user-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  background: var(--black);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 50%;
+}
+.user-avatar-fallback.large {
+  width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 300;
+  background: var(--white);
+  border: 1.5px solid var(--black);
+  border-radius: var(--radius);
+  box-shadow: 4px 4px 0 var(--black);
+  min-width: 220px;
+  overflow: hidden;
+}
+.user-dropdown-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--grey-mid);
+}
+.user-dropdown-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.user-dropdown-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--black);
+  margin: 0 0 0.15rem;
+}
+.user-dropdown-email {
+  font-size: 0.74rem;
+  color: var(--grey-text);
+  margin: 0;
+  word-break: break-all;
+}
+.user-signout-btn {
+  display: block;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--black);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.user-signout-btn:hover { background: var(--grey-light); }
+
 /* ── Credit display ── */
 .credit-display { position: relative; display: flex; align-items: center; }
 .credit-badge {
