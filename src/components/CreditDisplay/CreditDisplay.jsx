@@ -19,14 +19,16 @@ export default function CreditDisplay({ credits, onRefill }) {
     setOpen(false)
   }
 
+  const empty = credits < 1
+
   return (
     <div className="credit-display" ref={ref}>
       <button
-        className="credit-badge clickable"
+        className={`credit-badge clickable${empty ? ' empty' : ''}`}
         onClick={() => setOpen((v) => !v)}
-        title="Click to add credits"
+        title={empty ? 'Out of credits — click to buy' : 'Click to add credits'}
       >
-        ⭐ {credits} {credits === 1 ? 'credit' : 'credits'}
+        {empty ? '⭐ Out of credits' : `⭐ ${credits} ${credits === 1 ? 'credit' : 'credits'}`}
       </button>
 
       {open && (

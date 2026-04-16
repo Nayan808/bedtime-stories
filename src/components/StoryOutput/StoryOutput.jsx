@@ -142,8 +142,8 @@ export default function StoryOutput({
         </article>
       )}
 
-      {/* ── Voice player ── */}
-      {!isStreaming && !error && story.settings?.deliveryMode === 'voice' && (
+      {/* ── Voice player — shown for all completed stories ── */}
+      {!isStreaming && !error && story.body && (
         <AudioPlayer
           story={story}
           credits={credits}

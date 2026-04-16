@@ -25,6 +25,7 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
   const playingRef       = useRef(false)   // mirrors `playing` state for use inside closures
   const speedRef         = useRef(1)
   const selectedVoiceRef = useRef(null)
+  const voicesRef        = useRef([])      // always-current voices list for use in closures
   const timerRef         = useRef(null)
   const watchdogRef      = useRef(null)
   const startTimeRef     = useRef(0)
@@ -44,7 +45,10 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
   useEffect(() => {
     function load() {
       const v = window.speechSynthesis.getVoices()
-      if (v.length) setVoices(v)
+      if (v.length) {
+        setVoices(v)
+        voicesRef.current = v   // keep ref in sync for closures
+      }
     }
     load()
     window.speechSynthesis.addEventListener('voiceschanged', load)
@@ -78,7 +82,12 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
 
   // ── Core speak — cancel old utterance, start fresh from word index ──
   function speak(fromIdx = 0) {
-    window.speechSynthesis.cancel()
+    const ss = window.speechSynthesis
+    if (!ss) return
+
+    // Track if something was already speaking so we know whether to delay
+    const wasSpeaking = ss.speaking || ss.pending
+    ss.cancel()
     clearInterval(timerRef.current)
     clearInterval(watchdogRef.current)
 
@@ -88,8 +97,11 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
 
     const utter = new SpeechSynthesisUtterance(text)
     utter.rate  = speedRef.current
-    // Only assign voice if one is selected — null falls back to browser default
-    if (selectedVoiceRef.current) utter.voice = selectedVoiceRef.current
+
+    // Always set a voice — leaving it unset causes silent failure on many mobile browsers.
+    // Priority: user-selected → first available → browser default (null)
+    const voice = selectedVoiceRef.current || voicesRef.current[0] || null
+    if (voice) utter.voice = voice
 
     utter.onstart = () => {
       setPlaying(true)
@@ -122,7 +134,6 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     }
 
     utter.onerror = (e) => {
-      // 'interrupted' fires when we cancel intentionally — ignore it
       if (e.error === 'interrupted' || e.error === 'canceled') return
       setPlaying(false)
       playingRef.current = false
@@ -130,7 +141,21 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
       clearInterval(watchdogRef.current)
     }
 
-    window.speechSynthesis.speak(utter)
+    function doSpeak() {
+      // resume() clears Chrome's "paused" state before adding a new utterance
+      ss.resume()
+      ss.speak(utter)
+    }
+
+    if (wasSpeaking) {
+      // Chrome needs ~50ms to finish processing cancel() before a new speak() works.
+      // This delay is safe for iOS too because by the time a user pauses/restarts,
+      // the TTS engine is already unlocked from the first user-gesture play.
+      setTimeout(doSpeak, 50)
+    } else {
+      // Nothing was playing — call synchronously to preserve iOS user-gesture context.
+      doSpeak()
+    }
   }
 
   // ── Watchdog: Chrome Android stops speech after ~15s in background ──
@@ -256,28 +281,22 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
   }
 
   function handleRestart() {
-    window.speechSynthesis.cancel()
-    clearInterval(timerRef.current)
-    clearInterval(watchdogRef.current)
-    stopSilentAudio()
-    wordIdxRef.current     = 0
+    wordIdxRef.current       = 0
     pausedElapsedRef.current = 0
     setProgress(0)
     setElapsed(0)
     setHighlightIdx(-1)
     setPlaying(false)
     playingRef.current = false
-    // Small delay so cancel() fully clears before new utterance
-    setTimeout(() => speak(0), 80)
+    stopSilentAudio()
+    speak(0)   // speak() handles cancel + delay internally
   }
 
   function handleSpeedChange(s) {
     setSpeed(s)
     speedRef.current = s
     if (playingRef.current) {
-      const idx = wordIdxRef.current
-      window.speechSynthesis.cancel()
-      setTimeout(() => speak(idx), 80)
+      speak(wordIdxRef.current)   // speak() handles cancel + delay internally
     }
   }
 
@@ -413,15 +432,10 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
             className="voice-select"
             value={selectedVoice?.name || ''}
             onChange={(e) => {
-              const v = voices.find((v) => v.name === e.target.value)
+              const v = voicesRef.current.find((v) => v.name === e.target.value)
               setSelectedVoice(v)
-              selectedVoiceRef.current = v  // sync immediately — don't wait for effect
-              // If currently playing, restart with new voice
-              if (playingRef.current) {
-                const idx = wordIdxRef.current
-                window.speechSynthesis.cancel()
-                setTimeout(() => speak(idx), 80)
-              }
+              selectedVoiceRef.current = v  // sync immediately
+              if (playingRef.current) speak(wordIdxRef.current)
             }}
           >
             {voices.map((v) => (
