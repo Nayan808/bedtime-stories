@@ -3,6 +3,7 @@ import {
   runMigrations, getUser,
   initDeviceCredits, getDeviceCredits, deductDeviceCredits, addDeviceCredits,
 } from './services/storage'
+import LandingPage from './components/Landing/LandingPage'
 import StoryForm from './components/StoryForm/StoryForm'
 import StoryOutput from './components/StoryOutput/StoryOutput'
 import StoryHistory from './components/StoryHistory/StoryHistory'
@@ -11,10 +12,11 @@ import OutOfCreditsModal from './components/Modals/OutOfCreditsModal'
 import LoginRequiredModal from './components/Modals/LoginRequiredModal'
 import GoogleAuth from './components/Auth/GoogleAuth'
 
+// Pages: 'landing' | 'create' | 'history'
 export default function App() {
-  const [page, setPage]               = useState('home')
+  const [page, setPage]               = useState('landing')
   const [credits, setCredits]         = useState(0)
-  const [showNoCredits, setShowNoCredits]   = useState(false)
+  const [showNoCredits, setShowNoCredits]         = useState(false)
   const [showLoginRequired, setShowLoginRequired] = useState(false)
   const [activeStory, setActiveStory] = useState(null)
   const [generating, setGenerating]   = useState(false)
@@ -25,8 +27,6 @@ export default function App() {
 
   useEffect(() => {
     runMigrations()
-
-    // Load device credits if user is already logged in (page refresh)
     if (getUser()) setCredits(getDeviceCredits())
 
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
@@ -35,11 +35,9 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // Called by GoogleAuth after sign-in or sign-out
   function handleUserChange(newUser) {
     setUser(newUser)
     if (newUser) {
-      // First login on this device → 3 credits; returning → restore balance
       setCredits(initDeviceCredits())
       setShowLoginRequired(false)
     } else {
@@ -47,7 +45,6 @@ export default function App() {
     }
   }
 
-  // All credit operations go through here — device-level storage
   const refreshCredits = useCallback(() => {
     if (user) setCredits(getDeviceCredits())
   }, [user])
@@ -70,14 +67,15 @@ export default function App() {
     setInstallPrompt(null)
   }
 
+  function goHome() { setPage('landing'); setActiveStory(null) }
+  function goCreate() { setPage('create'); setActiveStory(null) }
+
   return (
     <div className="app">
+
+      {/* ── Header ── */}
       <header className="app-header">
-        <button
-          className="logo-btn"
-          onClick={() => { setPage('home'); setActiveStory(null) }}
-          aria-label="Go to home"
-        >
+        <button className="logo-btn" onClick={goHome} aria-label="Go to home">
           <span className="logo-moon">🌙</span>
           <span className="logo-text">Bedtime Stories</span>
         </button>
@@ -85,24 +83,27 @@ export default function App() {
         <nav className="header-nav">
           {user ? (
             <>
-              {/* Logged-in desktop nav */}
               <div className="nav-desktop">
                 {installPrompt && !installed && (
                   <button className="btn-install" onClick={handleInstall}>⬇ Install App</button>
                 )}
                 <button
                   className={`nav-btn${page === 'history' ? ' active' : ''}`}
-                  onClick={() => setPage('history')}
+                  onClick={() => { setPage('history'); setMenuOpen(false) }}
                 >
                   📚 History
+                </button>
+                <button
+                  className={`nav-btn nav-btn-create${page === 'create' ? ' active' : ''}`}
+                  onClick={goCreate}
+                >
+                  ✨ Create Story
                 </button>
               </div>
 
               <CreditDisplay credits={credits} onRefill={() => addCredits(3)} />
-
               <GoogleAuth user={user} onUserChange={handleUserChange} />
 
-              {/* Mobile hamburger — only when logged in */}
               <button
                 className="hamburger"
                 onClick={() => setMenuOpen((v) => !v)}
@@ -115,12 +116,15 @@ export default function App() {
               </button>
             </>
           ) : (
-            /* Logged-out: only sign-in button */
-            <GoogleAuth user={user} onUserChange={handleUserChange} />
+            <>
+              <div className="nav-desktop">
+                <button className="nav-btn" onClick={goCreate}>✨ Create Story</button>
+              </div>
+              <GoogleAuth user={user} onUserChange={handleUserChange} />
+            </>
           )}
         </nav>
 
-        {/* Mobile dropdown — only when logged in */}
         {user && menuOpen && (
           <div className="mobile-menu">
             {installPrompt && !installed && (
@@ -128,6 +132,9 @@ export default function App() {
                 ⬇ Install App
               </button>
             )}
+            <button className="mobile-menu-item" onClick={() => { goCreate(); setMenuOpen(false) }}>
+              ✨ Create Story
+            </button>
             <button
               className={`mobile-menu-item${page === 'history' ? ' active' : ''}`}
               onClick={() => { setPage('history'); setMenuOpen(false) }}
@@ -138,11 +145,18 @@ export default function App() {
         )}
       </header>
 
+      {/* ── Main ── */}
       <main className="app-main">
-        {page === 'history' ? (
+        {page === 'landing' && !activeStory ? (
+          <LandingPage
+            user={user}
+            onCreateStory={goCreate}
+            onSignIn={handleUserChange}
+          />
+        ) : page === 'history' ? (
           <StoryHistory
-            onReadStory={(story) => { setActiveStory({ ...story, fromHistory: true }); setPage('home') }}
-            onHome={() => setPage('home')}
+            onReadStory={(story) => { setActiveStory({ ...story, fromHistory: true }); setPage('create') }}
+            onHome={goHome}
           />
         ) : activeStory ? (
           <StoryOutput
@@ -151,7 +165,7 @@ export default function App() {
             onCreditsChange={refreshCredits}
             onDeductCredits={deductCredits}
             onAddCredits={addCredits}
-            onNewStory={() => setActiveStory(null)}
+            onNewStory={() => { setActiveStory(null); setPage('create') }}
             onOutOfCredits={() => setShowNoCredits(true)}
           />
         ) : (
@@ -169,18 +183,18 @@ export default function App() {
         )}
       </main>
 
-      {showNoCredits && (
-        <OutOfCreditsModal
-          onClose={() => setShowNoCredits(false)}
-          onRefill={(n) => addCredits(n)}
-        />
-      )}
+      {/* ── Footer ── */}
+      <footer className="app-footer">
+        <span>© {new Date().getFullYear()} Bedtime Stories. All rights reserved.</span>
+        <span className="footer-divider">·</span>
+        <span>Powered by <a href="https://addinfi.com" target="_blank" rel="noopener noreferrer">Addinfi</a></span>
+      </footer>
 
+      {showNoCredits && (
+        <OutOfCreditsModal onClose={() => setShowNoCredits(false)} onRefill={(n) => addCredits(n)} />
+      )}
       {showLoginRequired && (
-        <LoginRequiredModal
-          onClose={() => setShowLoginRequired(false)}
-          onSignIn={handleUserChange}
-        />
+        <LoginRequiredModal onClose={() => setShowLoginRequired(false)} onSignIn={handleUserChange} />
       )}
     </div>
   )
