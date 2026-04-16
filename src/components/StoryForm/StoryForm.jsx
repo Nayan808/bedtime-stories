@@ -102,7 +102,6 @@ export default function StoryForm({ user, credits, onStoryReady, onDeductCredits
     <div className="story-form">
       <div className="form-hero">
         <h1 className="form-title">Create a Magical Story ✨</h1>
-        <p className="form-subtitle">Personalise every detail — your child becomes the hero</p>
       </div>
 
       {/* ── Delivery mode ── */}
@@ -162,10 +161,9 @@ export default function StoryForm({ user, credits, onStoryReady, onDeductCredits
 
       {/* ── Child name ── */}
       <section className="form-section">
-        <label className="section-label">Child's Name(s) <span className="optional">(optional)</span></label>
         <input
           className="text-input"
-          placeholder="e.g. Arya, Max — becomes the hero!"
+          placeholder="Child's name(s) — optional"
           value={form.childNames}
           onChange={(e) => set('childNames', e.target.value)}
         />

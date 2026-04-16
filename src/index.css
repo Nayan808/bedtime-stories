@@ -14,7 +14,7 @@
   --radius-sm:  6px;
   --font-body:  'Georgia', 'Times New Roman', serif;
   --font-ui:    -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --max-w:      820px;
+  --max-w:      1120px;
 }
 
 html { scroll-behavior: smooth; }
@@ -49,7 +49,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 1200px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 0 2rem;
   height: 62px;
@@ -1442,14 +1442,6 @@ body {
   position: relative;
   display: inline-block;
   color: var(--white);
-}
-.hero-title-accent::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: 4px;
-  height: 4px;
-  background: rgba(255,255,255,0.35);
-  border-radius: 2px;
 }
 
 .hero-subtitle {
