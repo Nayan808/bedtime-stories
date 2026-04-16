@@ -88,40 +88,45 @@ export default function App() {
         </button>
 
         <nav className="header-nav">
-          <div className="nav-desktop">
-            {installPrompt && !installed && (
-              <button className="btn-install" onClick={handleInstall} title="Install app on your device">
-                ⬇ Install App
+          {user ? (
+            <>
+              {/* Logged-in desktop nav */}
+              <div className="nav-desktop">
+                {installPrompt && !installed && (
+                  <button className="btn-install" onClick={handleInstall}>⬇ Install App</button>
+                )}
+                <button
+                  className={`nav-btn${page === 'history' ? ' active' : ''}`}
+                  onClick={() => setPage('history')}
+                >
+                  📚 History
+                </button>
+              </div>
+
+              <CreditDisplay credits={credits} onRefill={() => addCredits(3)} />
+
+              <GoogleAuth user={user} onUserChange={handleUserChange} />
+
+              {/* Mobile hamburger — only when logged in */}
+              <button
+                className="hamburger"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Menu"
+                aria-expanded={menuOpen}
+              >
+                <span className={`ham-line${menuOpen ? ' open' : ''}`} />
+                <span className={`ham-line${menuOpen ? ' open' : ''}`} />
+                <span className={`ham-line${menuOpen ? ' open' : ''}`} />
               </button>
-            )}
-            <button
-              className={`nav-btn${page === 'history' ? ' active' : ''}`}
-              onClick={() => setPage('history')}
-            >
-              📚 History
-            </button>
-          </div>
-
-          {user
-            ? <CreditDisplay credits={credits} onRefill={() => addCredits(3)} />
-            : <span className="credit-badge">⭐ 0 credits</span>
-          }
-
-          <GoogleAuth user={user} onUserChange={handleUserChange} />
-
-          <button
-            className="hamburger"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Menu"
-            aria-expanded={menuOpen}
-          >
-            <span className={`ham-line${menuOpen ? ' open' : ''}`} />
-            <span className={`ham-line${menuOpen ? ' open' : ''}`} />
-            <span className={`ham-line${menuOpen ? ' open' : ''}`} />
-          </button>
+            </>
+          ) : (
+            /* Logged-out: only sign-in button */
+            <GoogleAuth user={user} onUserChange={handleUserChange} />
+          )}
         </nav>
 
-        {menuOpen && (
+        {/* Mobile dropdown — only when logged in */}
+        {user && menuOpen && (
           <div className="mobile-menu">
             {installPrompt && !installed && (
               <button className="mobile-menu-item" onClick={() => { handleInstall(); setMenuOpen(false) }}>
@@ -134,14 +139,6 @@ export default function App() {
             >
               📚 History
             </button>
-            {!user && (
-              <button
-                className="mobile-menu-item"
-                onClick={() => { setShowLoginRequired(true); setMenuOpen(false) }}
-              >
-                Sign in with Google
-              </button>
-            )}
           </div>
         )}
       </header>

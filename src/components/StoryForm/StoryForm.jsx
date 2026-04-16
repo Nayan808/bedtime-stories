@@ -63,7 +63,7 @@ export default function StoryForm({ user, credits, onStoryReady, onDeductCredits
 
   async function handleGenerate() {
     if (!user) { onLoginRequired(); return }
-    if (credits < 1) { onOutOfCredits(); return }
+    if (credits < 1) { onOutOfCredits(); return }   // logged in but no credits
 
     // Deduct immediately so credit badge updates before page transition
     onDeductCredits(1)
@@ -95,7 +95,8 @@ export default function StoryForm({ user, credits, onStoryReady, onDeductCredits
     setGenerating(false)
   }
 
-  const canGenerate = credits >= 1 && !generating
+  // Button is always clickable — login check and credit check happen inside handleGenerate
+  const canGenerate = !generating
 
   return (
     <div className="story-form">
@@ -370,11 +371,15 @@ export default function StoryForm({ user, credits, onStoryReady, onDeductCredits
           <button className="btn-cancel" onClick={handleCancel}>✕ Cancel</button>
         ) : (
           <button className="btn-generate" onClick={handleGenerate} disabled={!canGenerate}>
-            {credits < 1 ? '⭐ No credits — Refill to continue' : '✨ Generate Story — 1 credit'}
+            {!user
+              ? '✨ Create Story — Sign in for 3 free credits'
+              : credits < 1
+                ? '⭐ No credits — tap to refill'
+                : '✨ Generate Story — 1 credit'}
           </button>
         )}
-        {credits < 1 && (
-          <p className="no-credits-hint">You've used all your credits. Use the Refill (demo) button to get more.</p>
+        {user && credits < 1 && (
+          <p className="no-credits-hint">You've used all your credits. Click the credits badge to add more.</p>
         )}
       </div>
     </div>
