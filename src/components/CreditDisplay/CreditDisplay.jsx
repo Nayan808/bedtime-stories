@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { addCredits } from '../../services/storage'
 
 export default function CreditDisplay({ credits, onRefill }) {
   const [open, setOpen] = useState(false)
@@ -16,8 +15,7 @@ export default function CreditDisplay({ credits, onRefill }) {
   }, [open])
 
   function handleRefill(amount) {
-    addCredits(amount)
-    onRefill()
+    onRefill(amount)   // App.jsx addCredits handles storage + state
     setOpen(false)
   }
 
