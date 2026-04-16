@@ -3,36 +3,6 @@
  * The model must respond with: title on line 1, blank line, then story body.
  */
 
-// Random pools — picked on every call so every story is different
-const STORY_HOOKS = [
-  'The adventure begins when a mysterious letter arrives at the door.',
-  'Everything changes when an unexpected visitor knocks three times.',
-  'The story starts on the most ordinary day that suddenly turns extraordinary.',
-  'It all begins with a single glowing object nobody has ever seen before.',
-  'The journey starts when the main character discovers a hidden door.',
-  'Things get exciting when a tiny creature with a big secret appears.',
-  'The tale begins with an unusual sound coming from somewhere nearby.',
-  'It starts with a map with no words — only pictures leading somewhere wonderful.',
-  'The adventure kicks off when the main character makes an accidental discovery.',
-  'Everything changes after a dream that turns out to be real.',
-  'The story begins at sunrise, when magic is strongest.',
-  'It starts when the main character finds something shiny buried in the ground.',
-]
-
-const UNIQUE_DETAILS = [
-  "Include one surprising twist the reader won't expect.",
-  'Add one small moment of wonder that makes the world feel magical.',
-  'Give the main character one quirky habit that helps them succeed.',
-  'Include one funny misunderstanding that gets resolved happily.',
-  'Add one moment where the character helps someone smaller than them.',
-  'Include a small act of unexpected kindness from a stranger.',
-  'Add one detail about a beautiful place that feels vivid and real.',
-  'Give a side character one memorable, charming trait.',
-]
-
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
 
 const LENGTH_MAP = {
   tiny:   { label: 'Tiny (~2 min read)',   words: '200-300'   },
@@ -109,10 +79,7 @@ export function buildPrompt(form) {
   if (specialObject?.trim()) freeText.push(`Feature this special object or place: ${specialObject.trim()}`)
   if (extraDetails?.trim())  freeText.push(`Additional details to incorporate: ${extraDetails.trim()}`)
 
-  // Uniqueness seeds — different on every single call
-  const hook        = pickRandom(STORY_HOOKS)
-  const uniqueExtra = pickRandom(UNIQUE_DETAILS)
-  const seed        = Math.random().toString(36).slice(2, 9)
+  const seed = Math.random().toString(36).slice(2, 9)
 
   return `Write a completely original children's bedtime story. [id:${seed}]
 
@@ -121,22 +88,22 @@ RESPONSE FORMAT (strictly follow):
 - Line 2: Blank line
 - Line 3+: Story body in paragraphs
 
-REQUIREMENTS:
-- Age: ${ageGroup || '4–6'} years old
+STORY REQUIREMENTS:
+- Age group: ${ageGroup || '4–6'} years old
 - ${langNote}
 - Length: ${wordTarget} words
 - Tone: ${tone || 'Soothing'}
 - ${characterNote}
-${genreNote    ? `- ${genreNote}`   : ''}
-${settingNote  ? `- ${settingNote}` : ''}
-${moralNote    ? `- ${moralNote}`   : ''}
+${genreNote   ? `- ${genreNote}`   : ''}
+${settingNote ? `- ${settingNote}` : ''}
+${moralNote   ? `- ${moralNote}`   : ''}
 
-STORY HOOK (interpret creatively — don't copy literally):
-${hook}
-
-UNIQUENESS:
-- ${uniqueExtra}
-- Invent completely fresh character names, place names, and plot events. This story must be unlike any other.
+QUALITY RULES:
+- Every story must feel completely fresh — invent new character names, place names, and plot events every time
+- Match the tone and genre strictly to what is specified above; do not default to fantasy or magic unless the genre calls for it
+- Include natural, gentle humour appropriate for the age group
+- Keep the story warm, safe, and soothing throughout — no scary moments, no adult themes
+- End on a positive, heartwarming note that leaves the child feeling happy and calm
 ${toggles.length ? '\nSPECIAL INSTRUCTIONS:\n' + toggles.map(t => `- ${t}`).join('\n') : ''}
 ${advanced.length ? '\nADVANCED OPTIONS:\n' + advanced.map(a => `- ${a}`).join('\n') : ''}
 ${freeText.length ? '\nCUSTOM DETAILS:\n' + freeText.map(f => `- ${f}`).join('\n') : ''}
