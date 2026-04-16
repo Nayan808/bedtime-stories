@@ -39,7 +39,8 @@ body {
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 200;          /* raised so dropdown clears page content */
+  overflow: visible;     /* allow dropdown to spill below header */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -261,18 +262,22 @@ body {
   word-break: break-all;
 }
 .user-signout-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   width: 100%;
-  padding: 0.7rem 1rem;
+  padding: 0.72rem 1rem;
   background: none;
   border: none;
+  border-top: 1px solid var(--grey-mid);
   text-align: left;
-  font-size: 0.85rem;
-  color: var(--black);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #c0392b;
   cursor: pointer;
   transition: background 0.12s;
 }
-.user-signout-btn:hover { background: var(--grey-light); }
+.user-signout-btn:hover { background: #fff5f5; }
 
 /* ── Credit display ── */
 .credit-display { position: relative; display: flex; align-items: center; }
