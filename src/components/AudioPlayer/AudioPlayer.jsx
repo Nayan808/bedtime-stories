@@ -18,7 +18,9 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
   const [tapCount, setTapCount]         = useState(0)
 
   // refs that don't need re-renders
-  const words            = useRef([])
+  const words            = useRef(
+    `${story.title || ''}. ${story.body || ''}`.split(/\s+/).filter(Boolean)
+  )
   const wordIdxRef       = useRef(0)
   const playingRef       = useRef(false)   // mirrors `playing` state for use inside closures
   const speedRef         = useRef(1)
@@ -69,9 +71,9 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     setTotalTime(Math.round(wc / wps))
   }, [story.body, speed])
 
-  // Build words array
+  // Keep words array in sync as story streams in
   useEffect(() => {
-    words.current = `${story.title}. ${story.body || ''}`.split(/\s+/).filter(Boolean)
+    words.current = `${story.title || ''}. ${story.body || ''}`.split(/\s+/).filter(Boolean)
   }, [story.title, story.body])
 
   // ── Core speak — cancel old utterance, start fresh from word index ──
@@ -84,9 +86,10 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     const text = words.current.slice(fromIdx).join(' ')
     if (!text.trim()) return
 
-    const utter   = new SpeechSynthesisUtterance(text)
-    utter.rate    = speedRef.current
-    utter.voice   = selectedVoiceRef.current
+    const utter = new SpeechSynthesisUtterance(text)
+    utter.rate  = speedRef.current
+    // Only assign voice if one is selected — null falls back to browser default
+    if (selectedVoiceRef.current) utter.voice = selectedVoiceRef.current
 
     utter.onstart = () => {
       setPlaying(true)
@@ -132,14 +135,21 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
 
   // ── Watchdog: Chrome Android stops speech after ~15s in background ──
   // Every second, if we think we're playing but speechSynthesis isn't speaking, restart.
+  // 200ms grace timeout lets onend fire first for natural story completion.
   function startWatchdog() {
     clearInterval(watchdogRef.current)
     watchdogRef.current = setInterval(() => {
       if (!playingRef.current) { clearInterval(watchdogRef.current); return }
       const ss = window.speechSynthesis
       if (!ss.speaking && !ss.pending) {
-        // Unexpectedly stopped — re-speak from last known word
-        speak(wordIdxRef.current)
+        // Give onend 200ms to fire — if it does, playingRef.current becomes false
+        // and we won't restart. If it doesn't, speech was killed mid-story.
+        setTimeout(() => {
+          if (!playingRef.current) return   // onend already fired — natural end
+          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+            speak(wordIdxRef.current)
+          }
+        }, 200)
       }
     }, 1000)
   }
@@ -405,6 +415,13 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
             onChange={(e) => {
               const v = voices.find((v) => v.name === e.target.value)
               setSelectedVoice(v)
+              selectedVoiceRef.current = v  // sync immediately — don't wait for effect
+              // If currently playing, restart with new voice
+              if (playingRef.current) {
+                const idx = wordIdxRef.current
+                window.speechSynthesis.cancel()
+                setTimeout(() => speak(idx), 80)
+              }
             }}
           >
             {voices.map((v) => (
@@ -421,18 +438,25 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
               <span key={i} className={highlightIdx === i ? 'word-highlight' : ''}>{w}{' '}</span>
             ))}
           </p>
-          {(story.body || '').split('\n').map((para, pi) =>
-            para.trim() ? (
-              <p key={pi}>
-                {para.split(/\s+/).filter(Boolean).map((w, wi) => {
-                  const globalIdx = titleWordCount + wi
-                  return (
-                    <span key={wi} className={highlightIdx === globalIdx ? 'word-highlight' : ''}>{w}{' '}</span>
-                  )
-                })}
-              </p>
-            ) : <br key={pi} />
-          )}
+          {(() => {
+            let bodyWordOffset = 0
+            return (story.body || '').split('\n').map((para, pi) => {
+              if (!para.trim()) return <br key={pi} />
+              const paraWords = para.split(/\s+/).filter(Boolean)
+              const startOffset = bodyWordOffset
+              bodyWordOffset += paraWords.length
+              return (
+                <p key={pi}>
+                  {paraWords.map((w, wi) => {
+                    const globalIdx = titleWordCount + startOffset + wi
+                    return (
+                      <span key={wi} className={highlightIdx === globalIdx ? 'word-highlight' : ''}>{w}{' '}</span>
+                    )
+                  })}
+                </p>
+              )
+            })
+          })()}
         </div>
       )}
 
