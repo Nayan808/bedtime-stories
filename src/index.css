@@ -44,8 +44,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.5rem;
-  height: 58px;
+  padding: 0 2.5rem;
+  height: 62px;
   background: var(--white);
   border-bottom: 1px solid var(--black);
 }
@@ -67,9 +67,9 @@ body {
   letter-spacing: -0.02em;
 }
 
-.header-nav { display: flex; align-items: center; gap: 0.75rem; position: relative; }
+.header-nav { display: flex; align-items: center; gap: 1rem; position: relative; }
 
-.nav-desktop { display: flex; align-items: center; gap: 0.75rem; }
+.nav-desktop { display: flex; align-items: center; gap: 1rem; }
 
 /* ── Hamburger ── */
 .hamburger {
@@ -1460,7 +1460,7 @@ body {
    RESPONSIVE
 ═══════════════════════════════════════ */
 @media (max-width: 600px) {
-  .app-header    { padding: 0 1rem; }
+  .app-header    { padding: 0 1.25rem; }
   .logo-text     { font-size: 0.9rem; }
   .app-main      { padding: 1.25rem 1rem 3rem; }
   .adv-row       { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
