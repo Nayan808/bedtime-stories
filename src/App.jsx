@@ -91,13 +91,13 @@ export default function App() {
                   className={`nav-btn${page === 'history' ? ' active' : ''}`}
                   onClick={() => { setPage('history'); setMenuOpen(false) }}
                 >
-                  📚 History
+                  History
                 </button>
                 <button
                   className={`nav-btn nav-btn-create${page === 'create' ? ' active' : ''}`}
                   onClick={goCreate}
                 >
-                  ✨ Create Story
+                  Create Story
                 </button>
               </div>
 
@@ -118,7 +118,7 @@ export default function App() {
           ) : (
             <>
               <div className="nav-desktop">
-                <button className="nav-btn" onClick={goCreate}>✨ Create Story</button>
+                <button className="nav-btn" onClick={goCreate}>Create Story</button>
               </div>
               <GoogleAuth user={user} onUserChange={handleUserChange} />
             </>
@@ -133,13 +133,13 @@ export default function App() {
               </button>
             )}
             <button className="mobile-menu-item" onClick={() => { goCreate(); setMenuOpen(false) }}>
-              ✨ Create Story
+              Create Story
             </button>
             <button
               className={`mobile-menu-item${page === 'history' ? ' active' : ''}`}
               onClick={() => { setPage('history'); setMenuOpen(false) }}
             >
-              📚 History
+              History
             </button>
           </div>
         )}
