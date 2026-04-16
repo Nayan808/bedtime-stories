@@ -1,9 +1,6 @@
-import { addCredits } from '../../services/storage'
-
 export default function OutOfCreditsModal({ onClose, onRefill }) {
   function handleRefill() {
-    addCredits(3)
-    onRefill()
+    onRefill(3)   // App.jsx handles the actual credit add
     onClose()
   }
 

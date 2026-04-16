@@ -1148,6 +1148,35 @@ body {
 }
 .modal-close:hover { color: var(--black); }
 
+/* ── Login required modal ── */
+.login-modal { text-align: center; max-width: 360px; }
+.login-modal-icon { font-size: 2.5rem; line-height: 1; margin-bottom: 0.5rem; }
+.login-modal-title { font-size: 1.25rem; font-weight: 800; margin: 0 0 0.6rem; }
+.login-modal-desc {
+  font-size: 0.88rem;
+  color: var(--grey-text);
+  margin: 0 0 1.4rem;
+  line-height: 1.55;
+}
+.btn-google-signin.large {
+  padding: 0.65rem 1.4rem;
+  font-size: 0.95rem;
+  border-radius: var(--radius-sm);
+  width: 100%;
+  justify-content: center;
+}
+.modal-close-link {
+  display: block;
+  margin-top: 0.85rem;
+  background: none;
+  border: none;
+  color: var(--grey-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.modal-close-link:hover { color: var(--black); }
+
 /* ═══════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════ */

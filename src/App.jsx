@@ -1,16 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
-import { runMigrations, getCredits, getUser } from './services/storage'
+import {
+  runMigrations, getUser,
+  initUserCredits, getUserCredits, deductUserCredits, addUserCredits,
+} from './services/storage'
 import StoryForm from './components/StoryForm/StoryForm'
 import StoryOutput from './components/StoryOutput/StoryOutput'
 import StoryHistory from './components/StoryHistory/StoryHistory'
 import CreditDisplay from './components/CreditDisplay/CreditDisplay'
 import OutOfCreditsModal from './components/Modals/OutOfCreditsModal'
+import LoginRequiredModal from './components/Modals/LoginRequiredModal'
 import GoogleAuth from './components/Auth/GoogleAuth'
 
 export default function App() {
-  const [page, setPage]               = useState('home')   // 'home' | 'history'
+  const [page, setPage]               = useState('home')
   const [credits, setCredits]         = useState(0)
-  const [showNoCredits, setShowNoCredits] = useState(false)
+  const [showNoCredits, setShowNoCredits]   = useState(false)
+  const [showLoginRequired, setShowLoginRequired] = useState(false)
   const [activeStory, setActiveStory] = useState(null)
   const [generating, setGenerating]   = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -20,19 +25,47 @@ export default function App() {
 
   useEffect(() => {
     runMigrations()
-    setCredits(getCredits())
 
-    const handler = (e) => {
-      e.preventDefault()
-      setInstallPrompt(e)
-    }
+    // Load credits for already-logged-in user (page refresh)
+    const saved = getUser()
+    if (saved) setCredits(getUserCredits(saved.id))
+
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
     window.addEventListener('beforeinstallprompt', handler)
-    window.addEventListener('appinstalled', () => {
-      setInstalled(true)
-      setInstallPrompt(null)
-    })
+    window.addEventListener('appinstalled', () => { setInstalled(true); setInstallPrompt(null) })
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
+
+  // Called by GoogleAuth after sign-in or sign-out
+  function handleUserChange(newUser) {
+    setUser(newUser)
+    if (newUser) {
+      // New user → 3 credits; returning user → restore their balance
+      const bal = initUserCredits(newUser.id)
+      setCredits(bal)
+      // If login modal was open, close it
+      setShowLoginRequired(false)
+    } else {
+      setCredits(0)
+    }
+  }
+
+  // All credit operations go through here so they stay in sync with localStorage
+  const refreshCredits = useCallback(() => {
+    if (user) setCredits(getUserCredits(user.id))
+  }, [user])
+
+  const deductCredits = useCallback((amount) => {
+    if (!user) return
+    const next = deductUserCredits(user.id, amount)
+    setCredits(next)
+  }, [user])
+
+  const addCredits = useCallback((amount) => {
+    if (!user) return
+    const next = addUserCredits(user.id, amount)
+    setCredits(next)
+  }, [user])
 
   async function handleInstall() {
     if (!installPrompt) return
@@ -41,10 +74,6 @@ export default function App() {
     if (outcome === 'accepted') setInstalled(true)
     setInstallPrompt(null)
   }
-
-  const refreshCredits = useCallback(() => {
-    setCredits(getCredits())
-  }, [])
 
   return (
     <div className="app">
@@ -59,7 +88,6 @@ export default function App() {
         </button>
 
         <nav className="header-nav">
-          {/* Desktop: always visible */}
           <div className="nav-desktop">
             {installPrompt && !installed && (
               <button className="btn-install" onClick={handleInstall} title="Install app on your device">
@@ -74,11 +102,13 @@ export default function App() {
             </button>
           </div>
 
-          <CreditDisplay credits={credits} onRefill={refreshCredits} />
+          {user
+            ? <CreditDisplay credits={credits} onRefill={() => addCredits(3)} />
+            : <span className="credit-badge">⭐ 0 credits</span>
+          }
 
-          <GoogleAuth user={user} onUserChange={setUser} />
+          <GoogleAuth user={user} onUserChange={handleUserChange} />
 
-          {/* Mobile: hamburger */}
           <button
             className="hamburger"
             onClick={() => setMenuOpen((v) => !v)}
@@ -91,7 +121,6 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Mobile dropdown */}
         {menuOpen && (
           <div className="mobile-menu">
             {installPrompt && !installed && (
@@ -105,6 +134,14 @@ export default function App() {
             >
               📚 History
             </button>
+            {!user && (
+              <button
+                className="mobile-menu-item"
+                onClick={() => { setShowLoginRequired(true); setMenuOpen(false) }}
+              >
+                Sign in with Google
+              </button>
+            )}
           </div>
         )}
       </header>
@@ -112,10 +149,7 @@ export default function App() {
       <main className="app-main">
         {page === 'history' ? (
           <StoryHistory
-            onReadStory={(story) => {
-              setActiveStory({ ...story, fromHistory: true })
-              setPage('home')
-            }}
+            onReadStory={(story) => { setActiveStory({ ...story, fromHistory: true }); setPage('home') }}
             onHome={() => setPage('home')}
           />
         ) : activeStory ? (
@@ -123,18 +157,20 @@ export default function App() {
             story={activeStory}
             credits={credits}
             onCreditsChange={refreshCredits}
+            onDeductCredits={deductCredits}
+            onAddCredits={addCredits}
             onNewStory={() => setActiveStory(null)}
             onOutOfCredits={() => setShowNoCredits(true)}
           />
         ) : (
           <StoryForm
+            user={user}
             credits={credits}
-            onStoryReady={(story) => {
-              setActiveStory(story)
-              refreshCredits()
-            }}
+            onStoryReady={(story) => { setActiveStory(story); refreshCredits() }}
+            onDeductCredits={deductCredits}
             onCreditsChange={refreshCredits}
             onOutOfCredits={() => setShowNoCredits(true)}
+            onLoginRequired={() => setShowLoginRequired(true)}
             generating={generating}
             setGenerating={setGenerating}
           />
@@ -144,7 +180,14 @@ export default function App() {
       {showNoCredits && (
         <OutOfCreditsModal
           onClose={() => setShowNoCredits(false)}
-          onRefill={refreshCredits}
+          onRefill={(n) => addCredits(n)}
+        />
+      )}
+
+      {showLoginRequired && (
+        <LoginRequiredModal
+          onClose={() => setShowLoginRequired(false)}
+          onSignIn={handleUserChange}
         />
       )}
     </div>

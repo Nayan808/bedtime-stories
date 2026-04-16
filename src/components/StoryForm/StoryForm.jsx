@@ -1,6 +1,6 @@
 import { useState, useTransition } from 'react'
 import { buildPrompt } from '../../utils/promptBuilder'
-import { deductCredits, saveSettings, getSettings } from '../../services/storage'
+import { saveSettings, getSettings } from '../../services/storage'
 import ChipGroup from './ChipGroup'
 
 const DEFAULT_FORM = {
@@ -44,7 +44,7 @@ const LENGTHS       = [
 ]
 const TONES = ['Soothing','Exciting','Silly','Mysterious','Educational','Inspiring']
 
-export default function StoryForm({ credits, onStoryReady, onCreditsChange, onOutOfCredits, generating, setGenerating }) {
+export default function StoryForm({ user, credits, onStoryReady, onDeductCredits, onCreditsChange, onOutOfCredits, onLoginRequired, generating, setGenerating }) {
   const [form, setForm]               = useState(() => getSettings() || DEFAULT_FORM)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [customLang, setCustomLang]   = useState('')
@@ -62,11 +62,11 @@ export default function StoryForm({ credits, onStoryReady, onCreditsChange, onOu
   }
 
   async function handleGenerate() {
+    if (!user) { onLoginRequired(); return }
     if (credits < 1) { onOutOfCredits(); return }
 
     // Deduct immediately so credit badge updates before page transition
-    deductCredits(1)
-    onCreditsChange()
+    onDeductCredits(1)
     setGenerating(true)
 
     const effectiveLang = form.language === 'Custom' ? customLang || 'English' : form.language

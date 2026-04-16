@@ -6,6 +6,41 @@ export const KEYS = {
   USER:     'bs_user',
 }
 
+// ─── Per-user credits (keyed by Google user ID) ───────────────────────────────
+// Returns the user's credit balance; gives 3 free credits on first ever login.
+export function initUserCredits(userId) {
+  const initKey = `bs_init_${userId}`
+  const balKey  = `bs_credits_${userId}`
+  if (!localStorage.getItem(initKey)) {
+    localStorage.setItem(initKey, '1')
+    localStorage.setItem(balKey, '3')
+    return 3
+  }
+  const raw = localStorage.getItem(balKey)
+  return raw !== null ? parseInt(raw, 10) : 0
+}
+
+export function getUserCredits(userId) {
+  const raw = localStorage.getItem(`bs_credits_${userId}`)
+  return raw !== null ? parseInt(raw, 10) : 0
+}
+
+export function setUserCredits(userId, amount) {
+  localStorage.setItem(`bs_credits_${userId}`, String(Math.max(0, amount)))
+}
+
+export function deductUserCredits(userId, amount) {
+  const next = Math.max(0, getUserCredits(userId) - amount)
+  setUserCredits(userId, next)
+  return next
+}
+
+export function addUserCredits(userId, amount) {
+  const next = getUserCredits(userId) + amount
+  setUserCredits(userId, next)
+  return next
+}
+
 // ─── User / Auth ──────────────────────────────────────────────────────────────
 
 export function getUser() {

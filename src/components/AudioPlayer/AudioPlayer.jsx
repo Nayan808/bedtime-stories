@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { deductCredits, attachAudioToStory } from '../../services/storage'
+import { attachAudioToStory } from '../../services/storage'
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2]
 
-export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCredits }) {
+export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCredits }) {
   const [voices, setVoices]             = useState([])
   const [selectedVoice, setSelectedVoice] = useState(null)
   const [speed, setSpeed]               = useState(1)
@@ -224,8 +224,7 @@ export default function AudioPlayer({ story, credits, onCreditsChange, onOutOfCr
   function handlePlayPress() {
     if (!story.fromHistory && !unlocked) {
       if (credits < 2) { onOutOfCredits(); return }
-      deductCredits(2)
-      onCreditsChange()
+      onDeductCredits(2)
       setUnlocked(true)
     }
     if (playing) {

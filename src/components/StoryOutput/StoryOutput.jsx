@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { streamStory, parseStory } from '../../services/api'
-import { addCredits, saveStory } from '../../services/storage'
+import { saveStory } from '../../services/storage'
 import AudioPlayer from '../AudioPlayer/AudioPlayer'
 import SharePanel from './SharePanel'
 
@@ -8,6 +8,8 @@ export default function StoryOutput({
   story: initialStory,
   credits,
   onCreditsChange,
+  onDeductCredits,
+  onAddCredits,
   onNewStory,
   onOutOfCredits,
 }) {
@@ -60,8 +62,7 @@ export default function StoryOutput({
       } catch (err) {
         if (err.name === 'AbortError') return
         // Refund the credit on real API errors
-        addCredits(1)
-        onCreditsChange()
+        onAddCredits(1)
         setError(err.message || 'Something went wrong. Please try again.')
         setStory((prev) => ({ ...prev, streaming: false }))
       }
@@ -146,7 +147,7 @@ export default function StoryOutput({
         <AudioPlayer
           story={story}
           credits={credits}
-          onCreditsChange={onCreditsChange}
+          onDeductCredits={onDeductCredits}
           onOutOfCredits={onOutOfCredits}
         />
       )}
