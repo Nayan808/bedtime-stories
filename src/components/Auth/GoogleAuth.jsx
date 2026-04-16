@@ -116,10 +116,12 @@ export default function GoogleAuth({ user, onUserChange }) {
         aria-label="Account menu"
         aria-expanded={menuOpen}
       >
-        {user.picture
-          ? <img className="user-avatar" src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
-          : <span className="user-avatar-fallback">{user.name?.[0]?.toUpperCase()}</span>
-        }
+        <span className="user-avatar-circle">
+          {user.picture
+            ? <img className="user-avatar" src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
+            : <span className="user-avatar-fallback">{user.name?.[0]?.toUpperCase()}</span>
+          }
+        </span>
         <span className="avatar-chevron">{menuOpen ? '▲' : '▼'}</span>
       </button>
 

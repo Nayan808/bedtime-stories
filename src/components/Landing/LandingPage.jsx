@@ -11,11 +11,6 @@ export default function LandingPage({ onCreateStory, onSignIn, user }) {
               Magical Bedtime Stories,<br />
               <span className="hero-title-accent">Made for Your Child</span>
             </h1>
-            <p className="hero-subtitle">
-              Generate personalised, unique bedtime stories in seconds.
-              Choose the genre, characters, moral — and let AI write a story
-              your child will ask for again and again.
-            </p>
             <div className="hero-cta">
               <button className="btn-hero-primary" onClick={onCreateStory}>
                 Create a Story Free
