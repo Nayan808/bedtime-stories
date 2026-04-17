@@ -16,6 +16,11 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
   const [recording, setRecording]       = useState(false)
   const [locked, setLocked]             = useState(false)
   const [tapCount, setTapCount]         = useState(0)
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [lockTime, setLockTime]         = useState('')
+
+  const wakeLockRef    = useRef(null)
+  const lockTimerRef   = useRef(null)
 
   // refs that don't need re-renders
   const words            = useRef(
@@ -104,6 +109,7 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     if (voice) utter.voice = voice
 
     utter.onstart = () => {
+      setAudioLoading(false)
       setPlaying(true)
       playingRef.current = true
       startTimeRef.current = Date.now()
@@ -134,6 +140,7 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     }
 
     utter.onerror = (e) => {
+      setAudioLoading(false)
       if (e.error === 'interrupted' || e.error === 'canceled') return
       setPlaying(false)
       playingRef.current = false
@@ -179,19 +186,25 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     }, 1000)
   }
 
-  // ── Silent AudioContext ──
+  // ── Silent AudioContext (oscillator at gain=0 keeps audio session alive on lock screen) ──
   function startSilentAudio() {
     try {
       if (silentCtxRef.current) return
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       silentCtxRef.current = ctx
-      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate)
-      const src = ctx.createBufferSource()
-      src.buffer = buf
-      src.loop   = true
-      src.connect(ctx.destination)
-      src.start()
-      silentNodeRef.current = src
+
+      const oscillator = ctx.createOscillator()
+      const gainNode   = ctx.createGain()
+      gainNode.gain.value = 0        // completely silent but session stays alive
+      oscillator.connect(gainNode)
+      gainNode.connect(ctx.destination)
+      oscillator.start()
+      silentNodeRef.current = oscillator
+
+      // If browser suspends the context (e.g. after lock), resume it
+      ctx.addEventListener('statechange', () => {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+      })
     } catch (_) {}
   }
 
@@ -241,23 +254,41 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     }, 500)
   }
 
-  // ── Visibility: re-speak when returning from background / unlock ──
+  // ── Visibility: re-speak when returning from background / lock screen ──
   useEffect(() => {
     function onVisible() {
-      if (!document.hidden && playingRef.current) {
-        // Give browser a moment, then check if speech actually stopped
+      if (document.hidden || !playingRef.current) return
+
+      // Resume suspended AudioContext immediately
+      if (silentCtxRef.current?.state === 'suspended') {
+        silentCtxRef.current.resume().catch(() => {})
+      }
+
+      // Retry up to 4 times — some devices need a moment after unlock
+      const delays = [300, 800, 1500, 3000]
+      delays.forEach((ms) => {
         setTimeout(() => {
-          if (!window.speechSynthesis.speaking) {
+          if (!playingRef.current) return
+          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
             speak(wordIdxRef.current)
           } else if (window.speechSynthesis.paused) {
-            // Fallback try resume — some browsers support it
             window.speechSynthesis.resume()
           }
-        }, 400)
-      }
+        }, ms)
+      })
     }
+
+    // pageshow fires when page is restored from bfcache (back/forward navigation)
+    function onPageShow(e) {
+      if (e.persisted && playingRef.current) speak(wordIdxRef.current)
+    }
+
     document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    window.addEventListener('pageshow', onPageShow)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onPageShow)
+    }
   }, []) // no deps — uses refs only
 
   // ── Controls ──
@@ -292,6 +323,7 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
       updateMediaSession(false)
     } else {
       // PLAY / RESUME from saved position
+      setAudioLoading(true)
       speak(wordIdxRef.current)
     }
   }
@@ -334,17 +366,70 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
     }
   }
 
-  function handleLock() {
+  function getTime() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  async function handleLock() {
     setLocked(true)
     setTapCount(0)
     clearTimeout(tapResetRef.current)
+    setLockTime(getTime())
+
+    // Live clock
+    lockTimerRef.current = setInterval(() => setLockTime(getTime()), 10000)
+
+    // Fullscreen
+    try {
+      await document.documentElement.requestFullscreen?.()
+    } catch (_) {}
+
+    // Screen Wake Lock — prevent screen from sleeping
+    try {
+      wakeLockRef.current = await navigator.wakeLock?.request('screen')
+    } catch (_) {}
+
+    // Orientation lock — portrait only
+    try {
+      await screen.orientation?.lock?.('portrait')
+    } catch (_) {}
+
+    // Re-enter fullscreen if user exits via hardware back/home
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+  }
+
+  function handleFullscreenChange() {
+    if (!document.fullscreenElement && locked) {
+      // Re-request after short delay
+      setTimeout(() => {
+        document.documentElement.requestFullscreen?.().catch(() => {})
+      }, 300)
+    }
+  }
+
+  async function handleUnlock() {
+    setLocked(false)
+    setTapCount(0)
+    clearTimeout(tapResetRef.current)
+    clearInterval(lockTimerRef.current)
+
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+
+    // Exit fullscreen
+    try { await document.exitFullscreen?.() } catch (_) {}
+
+    // Release wake lock
+    try { await wakeLockRef.current?.release(); wakeLockRef.current = null } catch (_) {}
+
+    // Release orientation lock
+    try { screen.orientation?.unlock?.() } catch (_) {}
   }
 
   function handleLockTap() {
     clearTimeout(tapResetRef.current)
     setTapCount((prev) => {
       const next = prev + 1
-      if (next >= 3) { setLocked(false); return 0 }
+      if (next >= 3) { handleUnlock(); return 0 }
       tapResetRef.current = setTimeout(() => setTapCount(0), 1500)
       return next
     })
@@ -397,7 +482,12 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
       window.speechSynthesis.cancel()
       clearInterval(timerRef.current)
       clearInterval(watchdogRef.current)
+      clearInterval(lockTimerRef.current)
       stopSilentAudio()
+      document.exitFullscreen?.().catch(() => {})
+      wakeLockRef.current?.release().catch(() => {})
+      screen.orientation?.unlock?.()
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
   }, [])
 
@@ -411,6 +501,17 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
       {!unlocked && !story.fromHistory && (
         <div className="voice-cost-notice">
           <span>Listening costs <strong>2 credits</strong> (you have {credits})</span>
+        </div>
+      )}
+
+      {audioLoading && (
+        <div className="audio-loading">
+          <div className="audio-loading-dots">
+            <span>🌙</span>
+            <span>⭐</span>
+            <span>✨</span>
+          </div>
+          <p className="audio-loading-text">Preparing your story's voice…</p>
         </div>
       )}
 
@@ -519,17 +620,22 @@ export default function AudioPlayer({ story, credits, onDeductCredits, onOutOfCr
 
       {locked && (
         <div className="lock-overlay" onClick={handleLockTap}>
+          <div className="lock-stars" aria-hidden="true">
+            {['✦','✧','✦','✧','✦','✧','✦','✧'].map((s, i) => (
+              <span key={i} className="lock-star" style={{ '--i': i }}>{s}</span>
+            ))}
+          </div>
           <div className="lock-inner">
-            <div className="lock-icon">🔒</div>
+            <p className="lock-clock">{lockTime}</p>
+            <div className="lock-icon">🌙</div>
             <h2 className="lock-title">{story.title || 'Bedtime Story'}</h2>
             <p className="lock-playing">♪ Playing…</p>
-            <p className="lock-hint">Tap 3 times to unlock</p>
+            <p className="lock-hint">Tap 3× to unlock</p>
             <div className="lock-dots">
               {[0, 1, 2].map((i) => (
                 <span key={i} className={`lock-dot${tapCount > i ? ' filled' : ''}`} />
               ))}
             </div>
-            {tapCount > 0 && <p className="lock-tap-count">{tapCount} / 3</p>}
           </div>
         </div>
       )}

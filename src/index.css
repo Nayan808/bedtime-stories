@@ -825,6 +825,34 @@ body {
 /* ═══════════════════════════════════════
    AUDIO PLAYER
 ═══════════════════════════════════════ */
+/* ── Audio loading ── */
+.audio-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 0 0.5rem;
+}
+.audio-loading-dots {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 1.4rem;
+}
+.audio-loading-dots span {
+  animation: audioBouce 1s ease-in-out infinite;
+}
+.audio-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.audio-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes audioBouce {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50%       { transform: translateY(-8px); opacity: 1; }
+}
+.audio-loading-text {
+  font-size: 0.82rem;
+  color: var(--grey-text);
+  letter-spacing: 0.01em;
+}
+
 .audio-player {
   background: var(--white);
   border: 1px solid var(--grey-mid);
@@ -1007,71 +1035,99 @@ body {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: var(--black);
+  background: #05060f;
   display: flex;
   align-items: center;
   justify-content: center;
   user-select: none;
   -webkit-user-select: none;
   cursor: pointer;
+  overflow: hidden;
 }
+
+/* Floating stars */
+.lock-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.lock-star {
+  position: absolute;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.7rem;
+  animation: starFloat 6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.8s);
+  left: calc(10% + var(--i) * 11%);
+  top: calc(8% + var(--i) * 9%);
+}
+@keyframes starFloat {
+  0%, 100% { transform: translateY(0) scale(1);   opacity: 0.3; }
+  50%       { transform: translateY(-18px) scale(1.3); opacity: 0.9; }
+}
+
 .lock-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.9rem;
-  padding: 2rem 1.5rem;
+  gap: 1rem;
+  padding: 2.5rem 2rem;
   text-align: center;
   pointer-events: none;
 }
-.lock-icon {
-  font-size: 3rem;
+.lock-clock {
+  font-size: 3.5rem;
+  font-weight: 200;
+  color: var(--white);
+  letter-spacing: 0.04em;
+  margin: 0;
   line-height: 1;
-  animation: lock-pulse 2.8s ease-in-out infinite;
+}
+.lock-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+  animation: lock-pulse 3s ease-in-out infinite;
 }
 @keyframes lock-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.6; transform: scale(0.93); }
+  0%, 100% { opacity: 1;   transform: scale(1) rotate(-5deg); }
+  50%       { opacity: 0.7; transform: scale(1.1) rotate(5deg); }
 }
 .lock-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--white);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
   margin: 0;
-  max-width: 280px;
+  max-width: 260px;
+  line-height: 1.35;
 }
 .lock-playing {
-  font-size: 0.82rem;
-  color: #888;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.4);
   margin: 0;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .lock-hint {
-  font-size: 0.9rem;
-  color: #aaa;
-  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.3);
+  margin: 0;
 }
 .lock-dots {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.9rem;
   margin-top: 0.25rem;
 }
 .lock-dot {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border: 2px solid #555;
+  border: 1.5px solid rgba(255,255,255,0.3);
   background: transparent;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
 }
 .lock-dot.filled {
   background: var(--white);
   border-color: var(--white);
-}
-.lock-tap-count {
-  font-size: 0.78rem;
-  color: #666;
-  margin: 0;
+  transform: scale(1.2);
 }
 
 /* ═══════════════════════════════════════
@@ -1581,7 +1637,10 @@ body {
   border: 1.5px solid #eee;
   border-radius: 16px;
   padding: 1.6rem 1.5rem;
-  text-align: left;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   position: relative;
   overflow: hidden;
