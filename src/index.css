@@ -1384,7 +1384,133 @@ body {
 }
 .app-footer a { color: var(--black); font-weight: 600; text-decoration: none; }
 .app-footer a:hover { text-decoration: underline; }
+.footer-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--black); font-size: 0.75rem; font-weight: 600;
+  text-decoration: none; font-family: inherit;
+}
+.footer-link:hover { text-decoration: underline; }
 .footer-divider { color: var(--grey-mid); }
+
+/* ── Payment modal ── */
+.modal-payment { max-width: 420px; }
+.payment-packages {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  width: 100%;
+}
+.payment-pkg {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem 0.5rem;
+  border: 2px solid var(--grey-mid);
+  border-radius: 14px;
+  background: var(--white);
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.payment-pkg.selected {
+  border-color: var(--black);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
+}
+.payment-pkg.featured {
+  border-color: var(--black);
+  background: var(--grey-light);
+}
+.pkg-badge {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--black);
+  color: var(--white);
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+.pkg-credits {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--black);
+  line-height: 1;
+}
+.pkg-credits-label {
+  font-size: 0.7rem;
+  color: var(--grey-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pkg-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--black);
+  margin-top: 0.35rem;
+}
+.pkg-per {
+  font-size: 0.65rem;
+  color: var(--grey-text);
+}
+.btn-pay { width: 100%; margin-top: 0.25rem; }
+.payment-error {
+  color: #c0392b;
+  font-size: 0.8rem;
+  text-align: center;
+  margin: 0.5rem 0;
+}
+.payment-legal {
+  font-size: 0.68rem;
+  color: var(--grey-text);
+  text-align: center;
+  margin-top: 0.85rem;
+  line-height: 1.6;
+}
+.payment-legal a { color: var(--black); font-weight: 600; }
+
+/* ── Legal pages ── */
+.legal-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+.legal-inner h1 {
+  font-size: 1.8rem;
+  font-weight: 900;
+  margin-bottom: 0.25rem;
+}
+.legal-date {
+  font-size: 0.8rem;
+  color: var(--grey-text);
+  margin-bottom: 2rem;
+}
+.legal-inner section {
+  margin-bottom: 2rem;
+}
+.legal-inner h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--grey-mid);
+  padding-bottom: 0.4rem;
+}
+.legal-inner p, .legal-inner li {
+  font-size: 0.9rem;
+  line-height: 1.75;
+  color: #333;
+}
+.legal-inner ul {
+  padding-left: 1.25rem;
+  margin-top: 0.4rem;
+}
+.legal-inner li { margin-bottom: 0.35rem; }
+.legal-inner a { color: var(--black); font-weight: 600; }
 
 /* ═══════════════════════════════════════
    LANDING PAGE  — Modern Dark/Light

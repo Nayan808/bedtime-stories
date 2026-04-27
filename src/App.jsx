@@ -11,8 +11,11 @@ import CreditDisplay from './components/CreditDisplay/CreditDisplay'
 import OutOfCreditsModal from './components/Modals/OutOfCreditsModal'
 import LoginRequiredModal from './components/Modals/LoginRequiredModal'
 import GoogleAuth from './components/Auth/GoogleAuth'
+import PrivacyPolicy from './components/Legal/PrivacyPolicy'
+import TermsOfService from './components/Legal/TermsOfService'
+import RefundPolicy from './components/Legal/RefundPolicy'
 
-// Pages: 'landing' | 'create' | 'history'
+// Pages: 'landing' | 'create' | 'history' | 'privacy' | 'terms' | 'refund'
 export default function App() {
   const [page, setPage]               = useState('landing')
   const [credits, setCredits]         = useState(0)
@@ -23,7 +26,6 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installed, setInstalled]     = useState(false)
   const [menuOpen, setMenuOpen]             = useState(false)
-  const [mobileCreditsOpen, setMobileCreditsOpen] = useState(false)
   const [user, setUser]               = useState(() => getUser())
 
   useEffect(() => {
@@ -73,7 +75,6 @@ export default function App() {
     clearUser()
     handleUserChange(null)
     setMenuOpen(false)
-    setMobileCreditsOpen(false)
   }
 
   function goHome() { setPage('landing'); setActiveStory(null) }
@@ -112,7 +113,7 @@ export default function App() {
                 </div>
 
                 <div className="credits-desktop">
-                  <CreditDisplay credits={credits} onRefill={(n) => addCredits(n)} />
+                  <CreditDisplay credits={credits} onBuyCredits={() => setShowNoCredits(true)} />
                 </div>
                 <GoogleAuth user={user} onUserChange={handleUserChange} />
 
@@ -141,28 +142,11 @@ export default function App() {
             <div className="mobile-menu">
               <button
                 className={`mobile-menu-credits${credits < 1 ? ' empty' : ''}`}
-                onClick={() => setMobileCreditsOpen((v) => !v)}
+                onClick={() => { setShowNoCredits(true); setMenuOpen(false) }}
               >
                 <span>{credits < 1 ? '⭐ Out of credits' : `⭐ ${credits} ${credits === 1 ? 'credit' : 'credits'}`}</span>
-                <span className="mobile-credits-chevron">{mobileCreditsOpen ? '▲' : '▼'}</span>
+                <span className="mobile-credits-chevron">＋</span>
               </button>
-              {mobileCreditsOpen && (
-                <div className="mobile-credits-refill">
-                  <p className="mobile-credits-refill-title">Add Credits</p>
-                  <div className="mobile-credits-refill-row">
-                    {[3, 10, 25].map((n) => (
-                      <button
-                        key={n}
-                        className={`mobile-refill-btn${n === 25 ? ' featured' : ''}`}
-                        onClick={() => { addCredits(n); setMobileCreditsOpen(false) }}
-                      >
-                        <span className="mobile-refill-amount">+{n}</span>
-                        <span className="mobile-refill-label">{n === 3 ? 'Quick' : n === 10 ? 'Standard' : 'Best value'}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
               {installPrompt && !installed && (
                 <button className="mobile-menu-item" onClick={() => { handleInstall(); setMenuOpen(false) }}>
                   ⬇ Install App
@@ -187,7 +171,13 @@ export default function App() {
 
       {/* ── Main ── */}
       <main className="app-main">
-        {page === 'landing' && !activeStory ? (
+        {page === 'privacy' ? (
+          <PrivacyPolicy onBack={goHome} />
+        ) : page === 'terms' ? (
+          <TermsOfService onBack={goHome} />
+        ) : page === 'refund' ? (
+          <RefundPolicy onBack={goHome} />
+        ) : page === 'landing' && !activeStory ? (
           <LandingPage
             user={user}
             onCreateStory={goCreate}
@@ -226,6 +216,12 @@ export default function App() {
       {/* ── Footer ── */}
       <footer className="app-footer">
         <span>© {new Date().getFullYear()} Bedtime Stories. All rights reserved.</span>
+        <span className="footer-divider">·</span>
+        <button className="footer-link" onClick={() => setPage('privacy')}>Privacy Policy</button>
+        <span className="footer-divider">·</span>
+        <button className="footer-link" onClick={() => setPage('terms')}>Terms</button>
+        <span className="footer-divider">·</span>
+        <button className="footer-link" onClick={() => setPage('refund')}>Refund Policy</button>
         <span className="footer-divider">·</span>
         <span>Powered by <a href="https://addinfi.com" target="_blank" rel="noopener noreferrer">Addinfi</a></span>
       </footer>
